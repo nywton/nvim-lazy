@@ -26,7 +26,7 @@ chmod 700 ~/.local/share/nvim/undodir
 Clone this repo into your Neovim config folder:
 
 ```bash
-git clone <your-repo-url> ~/.config/nvim
+git clone https://github.com/nywton/nvim-lazy ~/.config/nvim
 ```
 
 Then start Neovim:
