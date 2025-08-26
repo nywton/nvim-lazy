@@ -21,9 +21,7 @@ end, { desc = "Copy absolute file path" })
 
 
 -- Toggle NvimTree file explorer
--- vim.keymap.set("n", "<leader>e", function() vim.cmd("Ex") end, { desc = "Open Ex in current directory" })
 vim.keymap.set("n", "<leader>e", function() vim.cmd("Ex " .. vim.fn.expand("%:p:h")) end, { desc = "Open Ex in current file's directory" })
-
 
 -- Save current file forcibly
 vim.keymap.set("n", "<leader>w", "<cmd>:w!<CR>", { desc = "Save file" })
