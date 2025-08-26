@@ -41,13 +41,13 @@ o.signcolumn = "yes"          -- Always show sign column
 o.termguicolors = true        -- Enable 24-bit RGB colors
 o.splitbelow = true           -- New splits open below
 o.splitright = true           -- New splits open to the right
--- o.colorcolumn = "80"       -- Optional: ruler at column 80
+o.colorcolumn = "100"       -- Optional: ruler at column 80
 
 -- =====================
 -- Performance
 -- =====================
 o.ttimeoutlen = 0             -- No delay for mapped key sequences
-o.updatetime = 50             -- Faster completion & diagnostics updates
+o.updatetime = 200             -- Faster completion & diagnostics updates
 o.wildmenu = true             -- Enhanced command-line completion
 o.hidden = true               -- Allow hidden buffers (don’t force save)
 
