@@ -35,4 +35,11 @@ Then start Neovim:
 nvim
 ```
 
+## Fonts
+
+```bash
+brew install --cask font-jetbrains-mono-nerd-font
+```
+
+
 
