@@ -71,7 +71,7 @@ o.undofile = true
 -- =====================
 -- Clipboard
 -- =====================
-o.clipboard = "unnamedplus"   -- Use system clipboard
+-- o.clipboard = "unnamedplus"   -- Use system clipboard
 
 -- Special handling for WSL
 if vim.fn.has("wsl") == 1 then
