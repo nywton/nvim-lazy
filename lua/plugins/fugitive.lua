@@ -8,7 +8,7 @@ return {
 
     -- Git basic
     { "<leader>gb", "<cmd>Git blame<CR>", desc = "Git blame" },
-    { "<leader>gl", "<cmd>Git log<CR>",   desc = "Git log" },
+    { "<leader>gl", "<cmd>Git log<CR>",   desc = "Git log -p" },
 
     -- Git workflow
     -- { "<leader>gs", "<cmd>Git status<CR>", desc = "Git status" },
