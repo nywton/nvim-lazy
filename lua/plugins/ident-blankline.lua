@@ -34,5 +34,9 @@ return {
     })
 
     hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
+
+    -- 👇 Add this to show space characters as dots
+    vim.opt.list = true
+    vim.opt.listchars:append("space:·")
   end,
 }

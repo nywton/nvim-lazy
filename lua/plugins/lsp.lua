@@ -14,6 +14,19 @@ return {
       local util = require("lspconfig.util")
 
       -- ===============================
+      -- Enable local configuration files (project-specific configs) in the current working directory when you start Neovim
+      -- Then you can create a file .nvim.lua in the root directory of your project and just change vim.g.ruby_host_prg there
+      --- Project-local .nvim.lua config
+      -- vim.g.ruby_host_prg = "/Users/nywton/.rbenv/shims/ruby"
+      -- ===============================
+      vim.o.exrc = true
+
+      -- Ruby executable (which ruby)
+      vim.g.ruby_host_prg = "/Users/nywton/.rbenv/shims/ruby"
+
+      -- vim.o.secure = true
+
+      -- ===============================
       -- Diagnostics
       -- ===============================
       vim.o.updatetime = 250
@@ -114,13 +127,13 @@ return {
         on_attach = on_attach,
         capabilities = capabilities,
         filetypes = { "ruby" },
-        -- init_options = { formatter = "auto" },
-        -- settings = {
-        --   rubocop = {
-        --     command = "rubocop",
-        --     args = { "--format", "json" },
-        --   },
-        -- },
+        init_options = { formatter = "auto" },
+        settings = {
+          rubocop = {
+            command = "bundle",
+            args = { "exec", "rubocop", "--format", "json" },
+          },
+        },
       })
 
       -- Optional global fallback format
