@@ -2,6 +2,18 @@
 
 ---
 
+# on arch linux:
+```bash
+sudo pacman -Syu
+```
+# tooling
+```bash
+sudo pacman -S base-devel gcc git cmake unzip ninja curl \
+zsh git fzf fd ripgrep neovim sudo
+# (Optional): Install clang too (alternative to gcc):
+sudo pacman -S clang
+```
+
 ## Undo Directory
 
 This config saves undo history in:
