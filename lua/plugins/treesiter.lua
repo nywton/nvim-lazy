@@ -19,6 +19,7 @@ return {
       },
       ensure_installed = {
         "json",
+        "jsonc",
         "javascript",
         "typescript",
         "tsx",
@@ -34,7 +35,8 @@ return {
         "gitignore",
         "c",
         "rust",
-        "ruby"
+        "ruby",
+        "java",
       },
       incremental_selection = {
         enable = true,

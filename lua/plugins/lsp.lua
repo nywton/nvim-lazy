@@ -6,24 +6,18 @@ return {
       "williamboman/mason-lspconfig.nvim",
       "neovim/nvim-lspconfig",
       "hrsh7th/cmp-nvim-lsp",
+      "mfussenegger/nvim-jdtls",
     },
     config = function()
       local mason = require("mason")
       local mason_lspconfig = require("mason-lspconfig")
-      local lspconfig = require("lspconfig")
       local util = require("lspconfig.util")
 
       -- ===============================
-      -- Enable local configuration files (project-specific configs) in the current working directory when you start Neovim
-      -- Then you can create a file .nvim.lua in the root directory of your project and just change vim.g.ruby_host_prg there
-      --- Project-local .nvim.lua config
-      -- vim.g.ruby_host_prg = "/Users/nywton/.rbenv/shims/ruby"
+      -- Local project-specific configs
       -- ===============================
       vim.o.exrc = true
-
-      -- Ruby executable (which ruby)
       vim.g.ruby_host_prg = "/Users/nywton/.rbenv/shims/ruby"
-
       -- vim.o.secure = true
 
       -- ===============================
@@ -68,6 +62,7 @@ return {
           "tailwindcss",
           "ruby_lsp",
           "denols",
+          "jdtls",
         },
       })
 
@@ -86,57 +81,126 @@ return {
         end
       end
 
-      local is_deno = function(root_dir)
-        return util.root_pattern("deno.json", "deno.jsonc")(root_dir)
-      end
+      -- ===============================
+      -- Java (using nvim-jdtls)
+      -- ===============================
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "java" },
+        callback = function()
+          local jdtls = require("jdtls")
+          local root_dir = util.root_pattern("gradlew", "mvnw", ".git")(vim.fn.getcwd())
+          local project_name = vim.fn.fnamemodify(root_dir, ":p:h:t")
+          local workspace_dir = vim.fn.stdpath("data") .. "/jdtls-workspace/" .. project_name
 
-      -- LSP configs
-      lspconfig.denols.setup({
-        on_attach = on_attach,
-        capabilities = capabilities,
-        root_dir = function(fname)
-          if is_deno(fname) then
-            return util.root_pattern("deno.json", "deno.jsonc")(fname)
-          end
+          jdtls.start_or_attach({
+            cmd = { "jdtls" }, -- mason installs this
+            root_dir = root_dir,
+            capabilities = capabilities,
+            on_attach = on_attach,
+            settings = {
+              java = {},
+            },
+            init_options = {
+              bundles = {}, -- Add debug/test bundles later if needed
+            },
+            workspaceFolders = { workspace_dir },
+          })
         end,
+      })
+
+      -- ===============================
+      -- Define configs with new API
+      -- ===============================
+      vim.lsp.config.denols = {
+        cmd = { "deno", "lsp" },
+        root_dir = vim.fs.root(0, { "deno.json", "deno.jsonc" }),
         init_options = {
           enable = true,
           lint = true,
           unstable = true,
         },
-      })
-
-      lspconfig.html.setup({
-        on_attach = on_attach,
         capabilities = capabilities,
+        on_attach = on_attach,
+      }
+
+      vim.lsp.config.html = {
+        capabilities = capabilities,
+        on_attach = on_attach,
         filetypes = { "html", "htmx" },
-      })
+      }
 
-      lspconfig.cssls.setup({
-        on_attach = on_attach,
+      vim.lsp.config.cssls = {
         capabilities = capabilities,
+        on_attach = on_attach,
         filetypes = { "css", "scss", "less" },
-      })
+      }
 
-      lspconfig.tailwindcss.setup({
-        on_attach = on_attach,
+      vim.lsp.config.tailwindcss = {
         capabilities = capabilities,
-      })
+        on_attach = on_attach,
+      }
 
-      lspconfig.ruby_lsp.setup({
-        on_attach = on_attach,
+      vim.lsp.config.ruby_lsp = {
         capabilities = capabilities,
+        on_attach = on_attach,
         filetypes = { "ruby" },
         init_options = { formatter = "auto" },
         settings = {
           rubocop = {
             command = "bundle",
-            args = { "exec", "rubocop", "--format", "json" },
+            args = {
+              "exec",
+              "rubocop",
+              "--config",
+              vim.fn.getcwd() .. "/.rubocop.yml",
+              "--format",
+              "json",
+            },
           },
         },
+      }
+
+      -- ===============================
+      -- Autostart servers on filetypes
+      -- ===============================
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "typescript", "javascript", "javascriptreact", "typescriptreact" },
+        callback = function(args)
+          vim.lsp.start(vim.lsp.config.denols, { bufnr = args.buf })
+        end,
       })
 
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "html", "htmx" },
+        callback = function(args)
+          vim.lsp.start(vim.lsp.config.html, { bufnr = args.buf })
+        end,
+      })
+
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "css", "scss", "less" },
+        callback = function(args)
+          vim.lsp.start(vim.lsp.config.cssls, { bufnr = args.buf })
+        end,
+      })
+
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "ruby" },
+        callback = function(args)
+          vim.lsp.start(vim.lsp.config.ruby_lsp, { bufnr = args.buf })
+        end,
+      })
+
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "javascript", "typescript", "typescriptreact", "javascriptreact", "html", "css", "scss" },
+        callback = function(args)
+          vim.lsp.start(vim.lsp.config.tailwindcss, { bufnr = args.buf })
+        end,
+      })
+
+      -- ===============================
       -- Optional global fallback format
+      -- ===============================
       vim.api.nvim_create_autocmd("BufWritePre", {
         pattern = { "*.ts", "*.js", "*.tsx", "*.jsx", "*.json", "*.css", "*.scss", "*.html", "*.md", "*.lua" },
         callback = function()
@@ -144,7 +208,9 @@ return {
         end,
       })
 
+      -- ===============================
       -- Keymaps
+      -- ===============================
       local map = vim.keymap.set
       map("n", "gd", vim.lsp.buf.definition)
       map("n", "gr", vim.lsp.buf.references)
