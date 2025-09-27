@@ -61,7 +61,7 @@ return {
 					"cssls",
 					"tailwindcss",
 					"ruby_lsp",
-					"denols",
+					"ts_ls",
 					"jdtls",
 				},
 			})
@@ -72,7 +72,7 @@ return {
 				-- format on save
 				if client.server_capabilities.documentFormattingProvider then
 					vim.api.nvim_create_autocmd("BufWritePre", {
-						group = vim.api.nvim_create_augroup("Format", { clear = true }),
+						group = vim.api.nvim_create_augroup("Format" .. bufnr, { clear = true }),
 						buffer = bufnr,
 						callback = function()
 							vim.lsp.buf.format()
@@ -97,49 +97,79 @@ return {
 						root_dir = root_dir,
 						capabilities = capabilities,
 						on_attach = on_attach,
-						settings = {
-							java = {},
-						},
-						init_options = {
-							bundles = {}, -- Add debug/test bundles later if needed
-						},
+						settings = { java = {} },
+						init_options = { bundles = {} },
 						workspaceFolders = { workspace_dir },
 					})
 				end,
 			})
 
 			-- ===============================
-			-- Define configs with new API
+			-- TypeScript/JavaScript (ts_ls)
 			-- ===============================
-			vim.lsp.config.denols = {
-				cmd = { "deno", "lsp" },
-				root_dir = vim.fs.root(0, { "deno.json", "deno.jsonc" }),
-				init_options = {
-					enable = true,
-					lint = true,
-					unstable = true,
-				},
-				capabilities = capabilities,
+			vim.lsp.config.ts_ls = {
 				on_attach = on_attach,
+				capabilities = capabilities,
+				root_dir = function(fname)
+					return util.root_pattern("package.json", "tsconfig.json", "jsconfig.json", ".git")(fname)
+				end,
 			}
 
+			-- ===============================
+			-- Servers with new vim.lsp.config API
+			-- ===============================
+
+			-- HTML
 			vim.lsp.config.html = {
 				capabilities = capabilities,
 				on_attach = on_attach,
-				filetypes = { "html", "htmx" },
+				filetypes = { "html" },
 			}
 
+			-- CSS
 			vim.lsp.config.cssls = {
 				capabilities = capabilities,
 				on_attach = on_attach,
 				filetypes = { "css", "scss", "less" },
 			}
 
+			-- Tailwind LS (“tl_ls”), with support
 			vim.lsp.config.tailwindcss = {
 				capabilities = capabilities,
 				on_attach = on_attach,
+				filetypes = {
+					"html",
+					"javascript",
+					"javascriptreact",
+					"typescript",
+					"typescriptreact",
+					"vue",
+					"svelte",
+					"css",
+					"scss",
+					"less",
+					"heex",
+					"eelixir",
+					"eruby",
+					"templ",
+				},
+				settings = {
+					tailwindCSS = {
+						experimental = {
+							classRegex = {
+								-- class="..."
+								'class\\s*=\\s*"([^"]+)"',
+								-- :class="'px-4 py-2'"
+								':class\\s*=\\s*"([^"]+)"',
+								-- :class="[ 'p-2','m-2']" or :class="{ 'p-2': cond }"
+								':class\\s*=\\s*"[^"]*?([\'"][^\'"]+[\'"]).*"',
+							},
+						},
+					},
+				},
 			}
 
+			-- Ruby
 			vim.lsp.config.ruby_lsp = {
 				capabilities = capabilities,
 				on_attach = on_attach,
@@ -163,27 +193,34 @@ return {
 			-- ===============================
 			-- Autostart servers on filetypes
 			-- ===============================
+
+			-- TS/JS start ts_ls
 			vim.api.nvim_create_autocmd("FileType", {
-				pattern = { "typescript", "javascript", "javascriptreact", "typescriptreact", "eruby" },
+				pattern = { "typescript", "javascript", "javascriptreact", "typescriptreact" },
 				callback = function(args)
-					vim.lsp.start(vim.lsp.config.denols, { bufnr = args.buf })
+					vim.lsp.start(vim.lsp.config.ts_ls, { bufnr = args.buf })
 				end,
 			})
 
+			-- HTML start html + tailwindcss
 			vim.api.nvim_create_autocmd("FileType", {
-				pattern = { "html", "htmx" },
+				pattern = { "html" },
 				callback = function(args)
 					vim.lsp.start(vim.lsp.config.html, { bufnr = args.buf })
+					vim.lsp.start(vim.lsp.config.tailwindcss, { bufnr = args.buf })
 				end,
 			})
 
+			-- CSS/SCSS/LESS
 			vim.api.nvim_create_autocmd("FileType", {
 				pattern = { "css", "scss", "less" },
 				callback = function(args)
 					vim.lsp.start(vim.lsp.config.cssls, { bufnr = args.buf })
+					vim.lsp.start(vim.lsp.config.tailwindcss, { bufnr = args.buf })
 				end,
 			})
 
+			-- Ruby
 			vim.api.nvim_create_autocmd("FileType", {
 				pattern = { "ruby" },
 				callback = function(args)
@@ -191,8 +228,20 @@ return {
 				end,
 			})
 
+			-- Tailwind on extra templating fts (vue/svelte/eruby/etc.)
 			vim.api.nvim_create_autocmd("FileType", {
-				pattern = { "javascript", "typescript", "typescriptreact", "javascriptreact", "html", "css", "scss" },
+				pattern = {
+					"vue",
+					"svelte",
+					"heex",
+					"eelixir",
+					"eruby",
+					"templ",
+					"javascript",
+					"typescript",
+					"typescriptreact",
+					"javascriptreact",
+				},
 				callback = function(args)
 					vim.lsp.start(vim.lsp.config.tailwindcss, { bufnr = args.buf })
 				end,
