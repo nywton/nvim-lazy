@@ -5,14 +5,13 @@ return {
     dependencies = { "nvim-lua/plenary.nvim" },
     cmd = "Telescope", -- load only when :Telescope is called
     keys = {
-      { "<leader>f", "<cmd>Telescope find_files<CR>", desc = "Search all files" },
-      { "<leader>ks", "<cmd>Telescope keymaps<CR>", desc = "Search all keymaps" },
+      { "<C-f>", "<cmd>Telescope git_files<CR>", desc = "Git files" },
+      { "<C-p>", "<cmd>Telescope find_files<CR>", desc = "Search all files" },
+      { "<leader>t", "<cmd>Telescope keymaps<CR>", desc = "Search all keymaps" },
       { "<leader>gs", "<cmd>Telescope git_status<CR>", desc = "Git status" },
-      { "<leader>th", "<cmd>Telescope help_tags<CR>", desc = "Help tags" },
-      { "<C-p>", "<cmd>Telescope git_files<CR>", desc = "Git files" },
+      { "<leader>h", "<cmd>Telescope help_tags<CR>", desc = "Help tags" },
       { "<leader>s", "<cmd>Telescope live_grep<CR>", desc = "Live grep" },
       { "<leader>b", "<cmd>Telescope buffers<CR>", desc = "Buffers" },
-      { "<leader>hh", "<cmd>Telescope help_tags<CR>", desc = "Help tags" },
     },
     config = function()
       local telescope = require("telescope")
@@ -61,4 +60,3 @@ return {
     end,
   },
 }
-
