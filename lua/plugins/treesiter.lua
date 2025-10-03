@@ -19,7 +19,6 @@ return {
       },
       ensure_installed = {
         "json",
-        "jsonc",
         "javascript",
         "typescript",
         "tsx",
