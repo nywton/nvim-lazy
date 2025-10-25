@@ -8,7 +8,8 @@ vim.g.netrw_winsize = 80 -- width of netrw window
 vim.g.netrw_banner = 0 -- remove banner
 -- vim.g.netrw_liststyle = 3 -- tree view style
 -- Keep netrw synced with the current directory
-vim.g.netrw_keepdir = 0
+vim.g.netrw_keepdir = 1
+vim.g.netrw_localcopydircmd = 'cp -r'
 
 -- =====================
 -- Editor basics
