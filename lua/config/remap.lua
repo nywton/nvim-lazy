@@ -21,9 +21,6 @@ end, { desc = "Copy absolute file path" })
 
 -- Toggle Ex
 vim.keymap.set("n", "<leader>e", function()
-	vim.cmd("Ex " .. vim.fn.expand("%:p:h"))
-end, { desc = "Open Ex in current file's directory" })
-vim.keymap.set("n", "<leader>e", function()
 	if vim.bo.filetype == "netrw" then
 		-- if already in Ex, go back to the previous buffer
 		vim.cmd("b#")
@@ -43,7 +40,7 @@ vim.keymap.set("n", "<leader>q", "<cmd>:q!<CR>", { desc = "Quit window" })
 vim.keymap.set("n", "<leader>v", "<C-v>", { noremap = true, silent = true, desc = "Visual block mode" })
 
 -- Change directory and open remap file
-vim.keymap.set("n", "<leader>rm", ":cd ~/.config/nvim | edit lua/kyoris/remap.lua<CR>", {
+vim.keymap.set("n", "<leader>rm", ":cd ~/.config/nvim | edit lua/config/remap.lua<CR>", {
 	noremap = true,
 	silent = true,
 	desc = "Open remap.lua in config",
@@ -115,11 +112,11 @@ vim.keymap.set(
 	{ desc = "Replace word under cursor" }
 )
 
--- Open packer config
-vim.keymap.set("n", "<leader>vpp", "<cmd>e ~/.config/nvim/lua/kyoris/packer.lua<CR>", { desc = "Edit packer.lua" })
+-- Open lazy plugin config
+vim.keymap.set("n", "<leader>vpp", "<cmd>e ~/.config/nvim/lua/config/lazy.lua<CR>", { desc = "Edit lazy.lua" })
 
 -- Open remap config
-vim.keymap.set("n", "<leader>km", "<cmd>e ~/.config/nvim/lua/kyoris/remap.lua<CR>", { desc = "Edit remap.lua" })
+vim.keymap.set("n", "<leader>km", "<cmd>e ~/.config/nvim/lua/config/remap.lua<CR>", { desc = "Edit remap.lua" })
 
 -- Switch to next split window
 vim.keymap.set("n", "<leader><Tab>", "<C-w>w", { noremap = true, silent = true, desc = "Next window" })
@@ -132,12 +129,6 @@ vim.keymap.set("n", "<C-Down>", "<C-w>-", { noremap = true, silent = true, desc 
 
 -- Mix format current file (Elixir)
 vim.keymap.set("n", "<leader>mf", "<cmd>silent! !mix format %<CR>", { desc = "Mix format current file" })
-
--- Auto format on save for Elixir files
-vim.api.nvim_create_autocmd("BufWritePost", {
-	pattern = { "*.ex", "*.exs", "*.heex" },
-	command = "silent! !mix format %",
-})
 
 -- Cross-platform file path copying
 if vim.loop.os_uname().sysname == "Windows_NT" then

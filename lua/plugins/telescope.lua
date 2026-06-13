@@ -1,7 +1,10 @@
 return {
   {
     "nvim-telescope/telescope.nvim",
-    branch = "0.1.x",
+    -- `master` (not the frozen 0.1.x) is needed for Neovim 0.12 +
+    -- nvim-treesitter `main`: the previewer now uses vim.treesitter
+    -- (get_lang/start) instead of the removed ft_to_lang.
+    branch = "master",
     dependencies = { "nvim-lua/plenary.nvim" },
     cmd = "Telescope", -- load only when :Telescope is called
     keys = {
