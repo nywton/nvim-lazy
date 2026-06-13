@@ -46,3 +46,5 @@ brew install --cask font-jetbrains-mono-nerd-font
 ## Keymaps
 
 Leader is `<Space>`. Press `<leader>t` (Telescope keymaps) to browse everything; LSP maps (`gd`, `gr`, `K`, `<leader>ca`, `<leader>rn`, …) are active in buffers with an attached language server.
+
+See the [Cheatsheet](CHEATSHEET.md) for a sectioned list of useful keymaps and commands.
