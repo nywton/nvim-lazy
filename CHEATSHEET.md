@@ -68,6 +68,16 @@ Leader is `<Space>`. Press `<leader>t` to fuzzy-search every keymap live.
 | `<C-k>` / `<C-j>` | Next / prev quickfix item |
 | `<leader>k` / `<leader>j` | Next / prev loclist item |
 
+## Terminal (quick switcher)
+Toggles a reusable terminal — hiding it **keeps the session running** in the background (run `claude`, hide it, keep coding, toggle back and it's still going). Float and split are separate sessions.
+| Key | Action |
+|-----|--------|
+| `<leader>tt` | Toggle floating terminal |
+| `<leader>ts` | Toggle bottom split terminal |
+| `<Esc><Esc>` | Leave terminal-insert → normal mode |
+
+> Hide with the same toggle key — don't `:q`/`:bd` the buffer, that kills the running process.
+
 ## Harpoon
 | Key | Action |
 |-----|--------|

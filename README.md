@@ -12,6 +12,8 @@ Requires Neovim **0.11+** (uses the `vim.lsp.config`/`vim.lsp.enable` API).
 - **Treesitter** highlighting + `nvim-ts-autotag`
 - **Fuzzy find**: telescope · **Git**: fugitive + gitsigns · **Nav**: harpoon
 - **UI**: catppuccin, lualine, indent-blankline, colorizer
+- **Terminal**: plugin-free toggleable float/split terminal that keeps its session alive when hidden (`<leader>tt` / `<leader>ts`)
+- **Neovide**: GUI tuning with [blurred floating windows](https://neovide.dev/features.html#blurred-floating-windows), shadows and cursor animations (only applied when run inside Neovide)
 
 ## Install
 
