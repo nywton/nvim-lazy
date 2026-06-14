@@ -1,5 +1,7 @@
 # Neovim Config
 
+[![CI](https://github.com/nywton/nvim-lazy/actions/workflows/ci.yml/badge.svg)](https://github.com/nywton/nvim-lazy/actions/workflows/ci.yml)
+
 A lean, **Node-free** Lua config built on [lazy.nvim](https://github.com/folke/lazy.nvim), aimed at Ruby, JavaScript/TypeScript and Python. Runs on **Ubuntu/Debian, macOS**, and in a **Docker** container.
 
 Requires Neovim **0.12.0+** (nvim-treesitter's `main` branch and the `vim.lsp.config`/`vim.lsp.enable` API need it).
