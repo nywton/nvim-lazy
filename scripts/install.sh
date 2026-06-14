@@ -12,6 +12,8 @@
 #   REPO_URL       git remote to clone           (default: https://github.com/nywton/nvim-lazy)
 #   NVIM_DIR       where the config lives         (default: $HOME/.config/nvim)
 #   RUBY_VERSION   Ruby to install via rbenv      (default: 3.4.9)
+#   RUBY_SETUP     when rvm/system Ruby exists:    (default: unset → asks)
+#                  =update (rbenv) or =skip (keep existing)
 #   NO_SYNC=1      skip the headless plugin sync  (default: unset → sync runs)
 #   NO_RUBY=1      skip rbenv + Ruby setup        (default: unset → installs)
 #   NO_SHELL=1     skip zsh/oh-my-zsh setup       (default: unset → installs)
@@ -37,6 +39,19 @@ info()  { printf '%s==>%s %s\n' "$BLUE$BOLD" "$RESET" "$*"; }
 ok()    { printf '%s ok %s %s\n' "$GREEN$BOLD" "$RESET" "$*"; }
 warn()  { printf '%swarn%s %s\n' "$YELLOW$BOLD" "$RESET" "$*"; }
 die()   { printf '%serr %s %s\n' "$RED$BOLD" "$RESET" "$*" >&2; exit 1; }
+
+# Ask the user a question on the controlling terminal and echo their answer.
+# Works even when this script is piped via `curl | bash` (stdin is the script,
+# so we read from /dev/tty). When no terminal is attached (CI, fully unattended
+# runs), the default ($2) is returned without blocking.
+prompt() {
+  local question="$1" default="$2" answer=""
+  if [ -r /dev/tty ]; then
+    printf '%s' "$question" > /dev/tty
+    IFS= read -r answer < /dev/tty || answer=""
+  fi
+  printf '%s' "${answer:-$default}"
+}
 
 # Run a command with sudo only when we are not already root.
 SUDO=""
@@ -322,6 +337,31 @@ persist_rbenv_to_shell() {
 
 install_ruby() {
   [ "${NO_RUBY:-}" = "1" ] && { warn "NO_RUBY=1 → skipping Ruby/rbenv setup"; return; }
+
+  # If Ruby is already managed elsewhere — rvm, or a system/other `ruby` that
+  # isn't our own rbenv shim — don't silently take it over. Ask whether to
+  # update via rbenv or keep (and use) the existing install. RUBY_SETUP can
+  # preset the answer for unattended runs: RUBY_SETUP=update | RUBY_SETUP=skip.
+  local has_rvm="" sys_ruby="" sys_ver=""
+  { command -v rvm >/dev/null 2>&1 || [ -d "$HOME/.rvm" ]; } && has_rvm=1
+  if command -v ruby >/dev/null 2>&1; then
+    case "$(command -v ruby)" in
+      "$RBENV_ROOT"/*) : ;;   # already our rbenv Ruby — fine to manage below
+      *) sys_ruby="$(command -v ruby)"; sys_ver="$(ruby -v 2>/dev/null | awk '{print $2}')" ;;
+    esac
+  fi
+
+  if [ -n "$has_rvm" ] || [ -n "$sys_ruby" ]; then
+    local found="" choice
+    [ -n "$has_rvm" ]  && found="rvm"
+    [ -n "$sys_ruby" ] && found="${found:+$found, }Ruby ${sys_ver:-?} at $sys_ruby"
+    warn "Existing Ruby toolchain detected: $found"
+    choice="${RUBY_SETUP:-$(prompt "Update Ruby via rbenv ([u]pdate) or skip and use the existing version ([s]kip)? [u/S] " skip)}"
+    case "$choice" in
+      u|U|update|Update|UPDATE) info "Updating Ruby via rbenv (per your choice)" ;;
+      *) ok "Keeping existing Ruby — skipping rbenv setup"; return ;;
+    esac
+  fi
 
   if [ "$OS" = "Linux" ]; then
     # ruby-build needs these to compile Ruby (libyaml is mandatory for 3.4+).
