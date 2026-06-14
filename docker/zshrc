@@ -1,0 +1,51 @@
+# ===========================================================================
+# zsh config for the nvim-lazy dev container
+# oh-my-zsh + autosuggestions + syntax-highlighting + a big, persistent history
+# ===========================================================================
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+
+# Plugins. zsh-syntax-highlighting must be loaded last.
+plugins=(
+  git
+  tmux
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+)
+
+source "$ZSH/oh-my-zsh.sh"
+
+# ---------------------------------------------------------------------------
+# History: large and persistent.
+# The file lives under a directory that is mounted as a volume (see
+# docker-compose.yml) so your command history survives container restarts.
+# ---------------------------------------------------------------------------
+HISTDIR="$HOME/.zsh_history.d"
+mkdir -p "$HISTDIR"
+export HISTFILE="$HISTDIR/history"
+export HISTSIZE=1000000          # commands kept in memory
+export SAVEHIST=1000000          # commands written to disk
+
+setopt EXTENDED_HISTORY          # record timestamp of each command
+setopt INC_APPEND_HISTORY        # write immediately, not on shell exit
+setopt SHARE_HISTORY             # share history across running shells
+setopt HIST_IGNORE_DUPS          # don't record an entry that duplicates the previous
+setopt HIST_IGNORE_ALL_DUPS      # remove older duplicate entries
+setopt HIST_IGNORE_SPACE         # don't record commands starting with a space
+setopt HIST_REDUCE_BLANKS        # trim superfluous blanks
+setopt HIST_VERIFY               # show expanded history command before running
+setopt HIST_FIND_NO_DUPS         # skip duplicates when searching
+
+# ---------------------------------------------------------------------------
+# Quality of life
+# ---------------------------------------------------------------------------
+export EDITOR=nvim
+export VISUAL=nvim
+alias vi=nvim
+alias vim=nvim
+alias ll='ls -lah --color=auto'
+
+# autosuggestions: accept with → / End; tune highlight + history+completion strategy
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"

@@ -32,4 +32,7 @@ require("lazy").setup({
   install = { colorscheme = { "habamax" } },
   -- automatically check for plugin updates
   checker = { enabled = true, notify = false },
+  -- No plugin in this config needs luarocks; disabling it stops lazy from
+  -- bootstrapping hererocks and clears the :checkhealth luarocks ERROR.
+  rocks = { enabled = false },
 })

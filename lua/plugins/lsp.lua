@@ -9,7 +9,6 @@ return {
 		config = function()
 			-- Allow project-local config (.nvim.lua / .exrc), with the built-in trust prompt
 			vim.o.exrc = true
-			vim.g.ruby_host_prg = vim.fn.expand("~/.rbenv/shims/ruby")
 
 			-- ===============================
 			-- Diagnostics
@@ -55,57 +54,23 @@ return {
 				init_options = { formatter = "auto" },
 			})
 
-			vim.lsp.config("pyright", {
-				settings = {
-					python = {
-						analysis = {
-							typeCheckingMode = "basic",
-							autoSearchPaths = true,
-							useLibraryCodeForTypes = true,
-						},
-					},
-				},
-			})
-
-			vim.lsp.config("tailwindcss", {
-				filetypes = {
-					"html",
-					"css",
-					"scss",
-					"less",
-					"javascript",
-					"javascriptreact",
-					"typescript",
-					"typescriptreact",
-					"vue",
-					"svelte",
-					"eruby",
-				},
-				settings = {
-					tailwindCSS = {
-						experimental = {
-							classRegex = {
-								'class\\s*=\\s*"([^"]+)"',
-								':class\\s*=\\s*"([^"]+)"',
-								':class\\s*=\\s*"[^"]*?([\'"][^\'"]+[\'"]).*"',
-							},
-						},
-					},
-				},
-			})
+			-- Python: jedi-language-server (pure Python, no Node runtime).
+			-- Completion / hover / go-to-definition / signatures.
+			vim.lsp.config("jedi_language_server", {})
 
 			-- ===============================
 			-- Mason + automatic server enable
 			-- ===============================
+			-- Node-free server set only. Every JS-runtime server (biome / ts_ls /
+			-- pyright / html / cssls / tailwindcss) is intentionally dropped — biome
+			-- installs via npm and the rest need Node. JS/TS/HTML/CSS still get
+			-- Treesitter highlighting + indentation (formatting on save via
+			-- conform's Treesitter fallback; see lua/config/tsformat.lua).
 			require("mason").setup()
 			require("mason-lspconfig").setup({
 				ensure_installed = {
-					"html",
-					"cssls",
-					"tailwindcss",
 					"ruby_lsp",
-					"ts_ls",
-					"pyright",
+					"jedi_language_server",
 				},
 			})
 

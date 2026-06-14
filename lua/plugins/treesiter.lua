@@ -9,28 +9,17 @@ return {
     "windwp/nvim-ts-autotag",
   },
   config = function()
-    local parsers = {
-      "json",
-      "javascript",
-      "typescript",
-      "tsx",
-      "yaml",
-      "html",
-      "css",
-      "markdown",
-      "markdown_inline",
-      "bash",
-      "lua",
-      "vim",
-      "vimdoc",
-      "dockerfile",
-      "gitignore",
-      "ruby",
-      "python",
-    }
+    -- Shared with scripts/install.sh and the Dockerfile (headless install).
+    local parsers = require("config.treesitter_parsers")
 
     -- Install runs asynchronously and is a no-op once parsers are present.
-    require("nvim-treesitter").install(parsers)
+    -- Deferred so the first-run "Downloading…" messages land after noice.nvim
+    -- (VeryLazy) has taken over the message UI — otherwise, when opening a file
+    -- straight from the shell, this fires mid-startup before noice is ready and
+    -- the raw messages trigger the blocking hit-enter prompt.
+    vim.defer_fn(function()
+      require("nvim-treesitter").install(parsers)
+    end, 300)
 
     -- On `main`, modules are gone: highlighting/indent are enabled per buffer.
     -- BufReadPre loads this plugin before FileType fires, so the autocmd is

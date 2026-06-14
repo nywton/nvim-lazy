@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Native Ubuntu: install Neovim + deps the way a user would, then run tests.
+  test-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build gettext \
+            ripgrep fd-find python3 python3-pip unzip curl git
+          sudo ln -sf "$(command -v fdfind)" /usr/local/bin/fd
+
+      - name: Install Neovim (stable)
+        run: |
+          curl -fL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz -o /tmp/nvim.tar.gz
+          sudo tar -xzf /tmp/nvim.tar.gz -C /opt
+          sudo mv /opt/nvim-linux-* /opt/neovim
+          sudo ln -sf /opt/neovim/bin/nvim /usr/local/bin/nvim
+          nvim --version | head -n1
+
+      - name: Install stylua
+        run: |
+          curl -fL https://github.com/JohnnyMorganz/StyLua/releases/latest/download/stylua-linux-x86_64.zip -o /tmp/stylua.zip
+          unzip -o /tmp/stylua.zip -d /tmp
+          sudo install -m 0755 /tmp/stylua /usr/local/bin/stylua
+
+      - name: Link checkout as the nvim config
+        run: |
+          mkdir -p ~/.config
+          ln -s "$GITHUB_WORKSPACE" ~/.config/nvim
+
+      - name: Run feature tests
+        run: bash tests/run.sh
+
+  # Prove the dev container builds and its tests pass.
+  test-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t neo-nvim .
+
+      - name: Run feature tests inside the container
+        run: docker run --rm neo-nvim bash /home/dev/.config/nvim/tests/run.sh
