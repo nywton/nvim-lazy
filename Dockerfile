@@ -8,7 +8,9 @@
 #
 # Debian-slim (glibc) is used on purpose: mason's prebuilt LSP servers and
 # blink.cmp's fuzzy binary are glibc builds and break on musl/alpine.
-FROM debian:bookworm-slim
+# Trixie (glibc 2.41) over bookworm (2.36): the prebuilt tree-sitter CLI is now
+# linked against GLIBC_2.39 and won't run on bookworm.
+FROM debian:trixie-slim
 
 ARG NVIM_VERSION=stable
 ENV DEBIAN_FRONTEND=noninteractive \
