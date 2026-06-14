@@ -40,7 +40,7 @@ jobs:
           nvim --headless "+TSUpdateSync" +qa 2>/dev/null || true
 
       - name: Open PR if lazy-lock.json changed
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: bump nvim plugins (lazy-lock.json)"
           title: "chore: bump nvim plugins"
