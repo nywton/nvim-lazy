@@ -15,7 +15,7 @@ jobs:
   test-ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install system deps
         run: |
@@ -51,7 +51,7 @@ jobs:
   test-docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build image
         run: docker build -t neo-nvim .
