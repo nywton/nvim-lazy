@@ -396,15 +396,34 @@ ram() {
 }
 
 disk() {
-  # used / size of the root volume (macOS reports "Gi", Linux "G")
-  df -h / | awk 'NR==2 { gsub(/Gi/, "G", $2); gsub(/Gi/, "G", $3); printf "%s/%s", $3, $2 }'
+  # used / size of the volume that actually holds user data.
+  # macOS APFS mounts a read-only *system* volume at "/" (reports almost no
+  # usage); the real data lives on the Data volume. Linux just uses "/".
+  local mount="/"
+  [ "$os" = "Darwin" ] && mount="/System/Volumes/Data"
+  df -h "$mount" | awk 'NR==2 { gsub(/Gi/, "G", $2); gsub(/Gi/, "G", $3); printf "%s/%s", $3, $2 }'
+}
+
+# Primary LAN IPv4. Named ipaddr() so it never shadows the `ip` command.
+ipaddr() {
+  local a=""
+  if [ "$os" = "Darwin" ]; then
+    a="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)"
+  else
+    # hostname -I lists all addresses (first is the primary); fall back to the
+    # route-based lookup if it's empty (e.g. hostname without the -I flag).
+    a="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
+    [ -n "$a" ] || a="$(ip route get 1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i+1); exit } }')"
+  fi
+  printf '%s' "${a:-—}"
 }
 
 case "$1" in
-  cpu)  cpu  ;;
-  gpu)  gpu  ;;
-  ram)  ram  ;;
-  disk) disk ;;
+  cpu)  cpu    ;;
+  gpu)  gpu    ;;
+  ram)  ram    ;;
+  disk) disk   ;;
+  ip)   ipaddr ;;
 esac
 STATSSH
   chmod +x "$stats"
@@ -534,8 +553,8 @@ TMUXCONF
 # >>> nvim-lazy tmux stats >>>  (managed block — remove the whole block to undo)
 set -g status-interval 5
 set -g status-right-length 160
-# system stats (cpu/gpu/ram/disk via ~/.config/tmux/stats.sh) + local IP + clock
-set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]GPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh gpu)  #[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#6C7086]#(ip route get 1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i==\"src\") print $(i+1); exit}' || ipconfig getifaddr en0 2>/dev/null || echo '—')  %H:%M  %d %b "
+# system stats (cpu/gpu/ram/disk + IP via ~/.config/tmux/stats.sh) + user@host + clock
+set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]GPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh gpu)  #[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#F9E2AF]#(whoami)@#H #[fg=#94E2D5]#(~/.config/tmux/stats.sh ip)  #[fg=#6C7086]%H:%M  %d %b "
 # <<< nvim-lazy tmux stats <<<
 TMUXSTATS
   mv "$tmp" "$rc"
