@@ -18,6 +18,7 @@
 #   NO_RUBY=1      skip rbenv + Ruby setup        (default: unset → installs)
 #   NO_SHELL=1     skip zsh/oh-my-zsh setup       (default: unset → installs)
 #   NO_FONT=1      skip the Nerd Font install     (default: unset → installs)
+#   NO_TMUX=1      skip tmux + ~/.tmux.conf setup (default: unset → installs)
 #
 set -euo pipefail
 
@@ -305,6 +306,132 @@ ZSHRC
 }
 
 # ----------------------------------------------------------------------------
+# tmux + ~/.tmux.conf  (Catppuccin Mocha config — pure tmux, no TPM/plugins).
+# Installs tmux (apt/brew) and writes the config ONLY when ~/.tmux.conf does
+# not already exist — an existing config is always left untouched. Idempotent
+# and safe to re-run. Skip the whole step with NO_TMUX=1.
+# ----------------------------------------------------------------------------
+install_tmux() {
+  [ "${NO_TMUX:-}" = "1" ] && { warn "NO_TMUX=1 → skipping tmux setup"; return; }
+
+  # --- tmux ---
+  if command -v tmux >/dev/null 2>&1; then
+    ok "tmux present"
+  else
+    info "Installing tmux"
+    if [ "$OS" = "Linux" ]; then
+      $SUDO apt-get install -y --no-install-recommends tmux \
+        || warn "could not install tmux via apt; install it manually"
+    else
+      brew install tmux || true
+    fi
+  fi
+
+  # --- ~/.tmux.conf — write only if absent; never clobber an existing config ---
+  local rc="$HOME/.tmux.conf"
+  if [ -e "$rc" ]; then
+    ok ".tmux.conf already exists → leaving it untouched"
+    return
+  fi
+
+  info "Writing $rc"
+  cat > "$rc" <<'TMUXCONF'
+# =============================================================================
+# General
+# =============================================================================
+
+set -g default-terminal "tmux-256color"
+set -ag terminal-overrides ",xterm-256color:RGB"
+
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+set -g base-index 1
+setw -g pane-base-index 1
+set -g renumber-windows on
+
+set -g mouse on
+set -g escape-time 0
+set -g history-limit 10000
+set -g focus-events on
+
+# vi mode
+set-window-option -g mode-keys vi
+# Use v to begin selection like Vim's visual mode
+bind-key -T copy-mode-vi v send-keys -X begin-selection
+# Use y to yank selection like Vim's yank
+bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+
+
+# =============================================================================
+# Keybinds
+# =============================================================================
+
+bind r source-file ~/.tmux.conf \; display "Config reloaded"
+
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+unbind '"'
+unbind %
+
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+# =============================================================================
+# Catppuccin Mocha — matching kitty config
+# =============================================================================
+
+# Palette
+# base     #1E1E2E
+# mantle   #11111B (tab_bar_background in kitty)
+# surface0 #313244
+# overlay0 #6C7086
+# text     #CDD6F4
+# peach    #fab387 (active tab color in kitty)
+# lavender #B4BEFE
+# mauve    #CBA6F7
+
+# Status bar
+set -g status on
+set -g status-position bottom
+set -g status-interval 5
+# "default" bg lets kitty's background_opacity bleed through
+set -g status-style "bg=default,fg=#6C7086"
+
+# Left: session name
+set -g status-left " #[fg=#CBA6F7,bg=default]#{session_name}#[fg=#6C7086]  "
+set -g status-left-length 30
+
+# Windows — bg=default keeps transparency
+set -g window-status-style         "bg=default"
+set -g window-status-current-style "bg=default"
+set -g window-status-format         "#[fg=#6C7086,bg=default] #{window_index}:#{window_name} "
+set -g window-status-current-format "#[fg=#fab387,bg=default] #{window_index}:#{window_name} "
+set -g window-status-separator ""
+
+# Pane borders
+set -g pane-border-style        "fg=#313244"
+set -g pane-active-border-style "fg=#B4BEFE"
+
+# Command / message line
+set -g message-style "bg=#313244,fg=#CDD6F4"
+
+# Right: local IP + date/time (works on both Linux `ip` and macOS `ipconfig`)
+set -g status-right "#[fg=#6C7086,bg=default]#(ip route get 1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i==\"src\") print $(i+1); exit}' || ipconfig getifaddr en0 2>/dev/null || echo '—')  %H:%M  %d %b "
+set -g status-right-length 60
+TMUXCONF
+  ok "configured .tmux.conf"
+
+  # Live-reload if we're running inside a tmux session.
+  if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
+    tmux source-file "$rc" >/dev/null 2>&1 && ok "reloaded running tmux config" || true
+  fi
+}
+
+# ----------------------------------------------------------------------------
 # Ruby (via rbenv)  —  required for ruby_lsp (LSP, installed by Mason) and
 # rubocop (formatter). rbenv keeps Ruby in $HOME, no system Ruby needed.
 # ----------------------------------------------------------------------------
@@ -488,6 +615,7 @@ main() {
     *) die "Unsupported OS: $OS (Linux/macOS only)" ;;
   esac
   install_shell        # zsh + oh-my-zsh + plugins (idempotent)
+  install_tmux         # tmux + ~/.tmux.conf (only if absent)
   install_ruby         # rbenv + pinned Ruby (before formatters: rubocop needs gem)
   install_formatters
   install_tree_sitter_cli
