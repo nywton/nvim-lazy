@@ -74,13 +74,14 @@ Already cloned? Update in place:
 - **Locale** — generates `en_US.UTF-8` if missing (Neovim's `:checkhealth` errors without a UTF-8 locale)
 - **Ruby** — [rbenv](https://github.com/rbenv/rbenv) + ruby-build, then Ruby `3.4.9` (pinned, set as `rbenv global`) for `ruby_lsp` and `rubocop`
 - **Shell** — `zsh` + [oh-my-zsh](https://ohmyz.sh), `zsh-autosuggestions`, `zsh-syntax-highlighting`, and `fzf`; wired into `~/.zshrc` via a single guarded block (your existing `~/.zshrc` is never overwritten)
+- **tmux** — `tmux`, a dependency-free `~/.config/tmux/stats.sh` (CPU/GPU/RAM/DISK, refreshed every 5s), and a Catppuccin Mocha `~/.tmux.conf` (pure tmux, no TPM/plugins). The base config is written only if you don't already have one; the stats status bar is added/refreshed on **every** run via a guarded managed block, so re-running picks it up even on top of an existing config. Skip with `NO_TMUX=1`
 - **Font** — JetBrainsMono Nerd Font into `~/.local/share/fonts` (Linux) or via brew cask (macOS); skip with `NO_FONT=1`
 - **Formatters** — `stylua` (lua), best-effort `black` (python, pip) and `rubocop` (ruby, gem)
 - **LSP binaries** `jedi-language-server` (and `ruby-lsp`, given a Ruby) install automatically via Mason on first launch
 
 Every step is **idempotent** — re-run any time to update; already-installed pieces are just checked/updated.
 
-Override defaults with env vars: `REPO_URL`, `NVIM_DIR`, `RUBY_VERSION` (default `3.4.9`), `NO_SYNC=1`, `NO_RUBY=1`, `NO_SHELL=1`.
+Override defaults with env vars: `REPO_URL`, `NVIM_DIR`, `RUBY_VERSION` (default `3.4.9`), `NO_SYNC=1`, `NO_RUBY=1`, `NO_SHELL=1`, `NO_TMUX=1`, `NO_FONT=1`.
 </details>
 
 ### Docker — disposable, batteries-included

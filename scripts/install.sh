@@ -307,9 +307,10 @@ ZSHRC
 
 # ----------------------------------------------------------------------------
 # tmux + ~/.tmux.conf  (Catppuccin Mocha config — pure tmux, no TPM/plugins).
-# Installs tmux (apt/brew) and writes the config ONLY when ~/.tmux.conf does
-# not already exist — an existing config is always left untouched. Idempotent
-# and safe to re-run. Skip the whole step with NO_TMUX=1.
+# Installs tmux (apt/brew), drops the status-bar stats helper at
+# ~/.config/tmux/stats.sh, and writes ~/.tmux.conf ONLY when it does not
+# already exist — an existing config is always left untouched. Idempotent and
+# safe to re-run. Skip the whole step with NO_TMUX=1.
 # ----------------------------------------------------------------------------
 install_tmux() {
   [ "${NO_TMUX:-}" = "1" ] && { warn "NO_TMUX=1 → skipping tmux setup"; return; }
@@ -327,15 +328,100 @@ install_tmux() {
     fi
   fi
 
-  # --- ~/.tmux.conf — write only if absent; never clobber an existing config ---
+  # --- ~/.config/tmux/stats.sh — the status-bar stats helper (cpu/gpu/ram/disk)
+  # referenced by status-right below. Always (re)written so updates propagate;
+  # it's a generated helper, not user-editable config. No external deps.
+  local stats="$HOME/.config/tmux/stats.sh"
+  info "Writing $stats"
+  mkdir -p "$(dirname "$stats")"
+  cat > "$stats" <<'STATSSH'
+#!/usr/bin/env bash
+# Lightweight system stats for the tmux status bar (macOS + Linux).
+# Usage: stats.sh <cpu|gpu|ram|disk>
+# No external dependencies / plugins — only built-in OS tools.
+
+os="$(uname -s)"
+
+cpu() {
+  if [ "$os" = "Darwin" ]; then
+    # 100 - idle%, from a single instantaneous top sample
+    top -l 1 -n 0 | awk '/CPU usage/ {
+      for (i = 1; i <= NF; i++)
+        if ($i == "idle") { gsub(/%/, "", $(i-1)); printf "%.1f%%", 100 - $(i-1) }
+    }'
+  else
+    # two /proc/stat samples ~0.2s apart → instantaneous busy %
+    read -r _ u1 n1 s1 i1 w1 q1 sq1 st1 _ < /proc/stat
+    sleep 0.2
+    read -r _ u2 n2 s2 i2 w2 q2 sq2 st2 _ < /proc/stat
+    local idle1=$((i1 + w1)) idle2=$((i2 + w2))
+    local tot1=$((u1 + n1 + s1 + i1 + w1 + q1 + sq1 + st1))
+    local tot2=$((u2 + n2 + s2 + i2 + w2 + q2 + sq2 + st2))
+    local dt=$((tot2 - tot1)) di=$((idle2 - idle1))
+    awk -v di="$di" -v dt="$dt" 'BEGIN { printf "%.1f%%", (dt > 0 ? (1 - di / dt) * 100 : 0) }'
+  fi
+}
+
+gpu() {
+  if [ "$os" = "Darwin" ]; then
+    # Apple Silicon GPU utilization from IOKit
+    ioreg -r -d 1 -w 0 -c AGXAccelerator 2>/dev/null \
+      | grep -o '"Device Utilization %"=[0-9]*' \
+      | head -1 \
+      | awk -F= '{ printf "%d%%", $2 }'
+  elif command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
+      | head -1 | awk '{ printf "%d%%", $1 }'
+  else
+    printf "n/a"
+  fi
+}
+
+ram() {
+  if [ "$os" = "Darwin" ]; then
+    # used / total in GB (total from sysctl, used from top's PhysMem line)
+    local total used
+    total=$(sysctl -n hw.memsize | awk '{ printf "%.0f", $1 / 1073741824 }')
+    used=$(top -l 1 -n 0 | awk '/PhysMem/ {
+      v = $2
+      if (v ~ /G$/)      { sub(/G/, "", v); printf "%.1f", v }
+      else if (v ~ /M$/) { sub(/M/, "", v); printf "%.1f", v / 1024 }
+    }')
+    printf "%sGB/%sGB" "$used" "$total"
+  else
+    # used / total in GB from /proc/meminfo (values are in kB)
+    awk '/^MemTotal:/ { t = $2 } /^MemAvailable:/ { a = $2 }
+         END { printf "%.1fGB/%.0fGB", (t - a) / 1048576, t / 1048576 }' /proc/meminfo
+  fi
+}
+
+disk() {
+  # used / size of the root volume (macOS reports "Gi", Linux "G")
+  df -h / | awk 'NR==2 { gsub(/Gi/, "G", $2); gsub(/Gi/, "G", $3); printf "%s/%s", $3, $2 }'
+}
+
+case "$1" in
+  cpu)  cpu  ;;
+  gpu)  gpu  ;;
+  ram)  ram  ;;
+  disk) disk ;;
+esac
+STATSSH
+  chmod +x "$stats"
+  ok "stats helper → $stats"
+
+  # --- ~/.tmux.conf ---
+  # Base config: written ONLY when absent (an existing config is never
+  # clobbered). The stats status bar is applied separately as a guarded
+  # managed block (below) so it's added/refreshed on EVERY run — even on top
+  # of a pre-existing or hand-edited config. tmux's `set -g` is last-wins, so
+  # the appended block overrides any earlier status-right.
   local rc="$HOME/.tmux.conf"
   if [ -e "$rc" ]; then
-    ok ".tmux.conf already exists → leaving it untouched"
-    return
-  fi
-
-  info "Writing $rc"
-  cat > "$rc" <<'TMUXCONF'
+    ok ".tmux.conf already exists → leaving the base config untouched"
+  else
+    info "Writing $rc"
+    cat > "$rc" <<'TMUXCONF'
 # =============================================================================
 # General
 # =============================================================================
@@ -419,11 +505,41 @@ set -g pane-active-border-style "fg=#B4BEFE"
 # Command / message line
 set -g message-style "bg=#313244,fg=#CDD6F4"
 
-# Right: local IP + date/time (works on both Linux `ip` and macOS `ipconfig`)
-set -g status-right "#[fg=#6C7086,bg=default]#(ip route get 1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i==\"src\") print $(i+1); exit}' || ipconfig getifaddr en0 2>/dev/null || echo '—')  %H:%M  %d %b "
-set -g status-right-length 60
+# NB: the status bar's right side (system stats + IP + clock) is appended as a
+# guarded managed block by the installer — keep it there so re-runs can refresh
+# it. See the "# >>> nvim-lazy tmux stats >>>" block at the bottom of this file.
 TMUXCONF
-  ok "configured .tmux.conf"
+    ok "configured .tmux.conf"
+  fi
+
+  # --- stats status bar (guarded managed block — added/refreshed every run) ---
+  # Idempotent: strip any previous block, then append the current one. tmux
+  # applies `set -g` last-wins, so this overrides whatever status-right the rest
+  # of the file (yours or ours) set. Remove the whole block to undo.
+  info "Applying tmux stats status bar (managed block)"
+  local tmp; tmp="$(mktemp)"
+  # Strip any previous managed block, then drop trailing blank lines so the
+  # single blank separator we re-add below can't accumulate across re-runs.
+  awk '
+    /^# >>> nvim-lazy tmux stats >>>/ { skip = 1 }
+    !skip { lines[++n] = $0 }
+    /^# <<< nvim-lazy tmux stats <<</ { skip = 0 }
+    END {
+      while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
+      for (i = 1; i <= n; i++) print lines[i]
+    }
+  ' "$rc" > "$tmp"
+  cat >> "$tmp" <<'TMUXSTATS'
+
+# >>> nvim-lazy tmux stats >>>  (managed block — remove the whole block to undo)
+set -g status-interval 5
+set -g status-right-length 160
+# system stats (cpu/gpu/ram/disk via ~/.config/tmux/stats.sh) + local IP + clock
+set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]GPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh gpu)  #[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#6C7086]#(ip route get 1 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i==\"src\") print $(i+1); exit}' || ipconfig getifaddr en0 2>/dev/null || echo '—')  %H:%M  %d %b "
+# <<< nvim-lazy tmux stats <<<
+TMUXSTATS
+  mv "$tmp" "$rc"
+  ok "stats status bar applied → $rc"
 
   # Live-reload if we're running inside a tmux session.
   if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
