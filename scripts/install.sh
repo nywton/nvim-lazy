@@ -145,19 +145,37 @@ install_deps_macos() {
 
 # ----------------------------------------------------------------------------
 # tree-sitter CLI  (REQUIRED by nvim-treesitter `main`: parsers are built with
-# `tree-sitter build`, not a bare C compiler). Node-free install via the
-# prebuilt release binary; macOS gets it from brew above.
+# `tree-sitter build`, not a bare C compiler). Idempotent: skips when already
+# present. On Linux, tries apt first (Ubuntu 24.04+ ships tree-sitter-cli),
+# then falls back to the prebuilt GitHub release binary. macOS uses brew above.
 # ----------------------------------------------------------------------------
 install_tree_sitter_cli() {
-  command -v tree-sitter >/dev/null 2>&1 && { ok "tree-sitter CLI present"; return; }
-  [ "$OS" = "Darwin" ] && return   # installed via brew above
+  command -v tree-sitter >/dev/null 2>&1 && { ok "tree-sitter CLI present ($(tree-sitter --version 2>/dev/null || echo unknown))"; return; }
 
+  if [ "$OS" = "Darwin" ]; then
+    info "Installing tree-sitter CLI via Homebrew"
+    brew install tree-sitter && ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)" \
+      || warn "could not install tree-sitter via brew; install it manually"
+    return
+  fi
+
+  # Try apt first — available in Ubuntu 24.04+ (noble) and later.
+  if command -v apt-get >/dev/null 2>&1 && apt-cache show tree-sitter-cli >/dev/null 2>&1; then
+    info "Installing tree-sitter-cli via apt"
+    if $SUDO apt-get install -y --no-install-recommends tree-sitter-cli; then
+      ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)"
+      return
+    fi
+    warn "apt install tree-sitter-cli failed; falling back to GitHub release"
+  fi
+
+  # Fall back to the prebuilt GitHub release binary (works on older Ubuntu too).
   case "$ARCH" in
     x86_64)        local ta="tree-sitter-linux-x64.gz" ;;
     aarch64|arm64) local ta="tree-sitter-linux-arm64.gz" ;;
     *) warn "no tree-sitter CLI build for $ARCH; treesitter parsers won't compile"; return ;;
   esac
-  info "Installing tree-sitter CLI ($ta)"
+  info "Installing tree-sitter CLI from GitHub release ($ta)"
   local tmp; tmp="$(mktemp -d)"
   if curl -fL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/${ta}" -o "${tmp}/ts.gz"; then
     gunzip -f "${tmp}/ts.gz"
