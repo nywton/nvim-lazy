@@ -19,6 +19,7 @@
 #   NO_SHELL=1     skip zsh/oh-my-zsh setup       (default: unset → installs)
 #   NO_FONT=1      skip the Nerd Font install     (default: unset → installs)
 #   NO_TMUX=1      skip tmux + ~/.tmux.conf setup (default: unset → installs)
+#   NO_KITTY=1     skip kitty terminal setup      (default: unset → prompts)
 #
 set -euo pipefail
 
@@ -723,6 +724,85 @@ install_formatters() {
 }
 
 # ----------------------------------------------------------------------------
+# kitty terminal  —  optional; prompts before installing unless NO_KITTY is set.
+# Installs kitty, drops config/kitty.conf from this repo into ~/.config/kitty/,
+# and sets kitty as the default x-terminal-emulator (Linux only; macOS users
+# set the default terminal in System Settings → Desktop & Dock). Skip with
+# NO_KITTY=1 or by answering "n" at the prompt.
+# ----------------------------------------------------------------------------
+install_kitty() {
+  [ "${NO_KITTY:-}" = "1" ] && { warn "NO_KITTY=1 → skipping kitty setup"; return; }
+
+  local answer
+  answer="$(prompt "Install and configure kitty terminal? [y/N] " n)"
+  case "$answer" in
+    y|Y|yes|Yes|YES) ;;
+    *) warn "skipping kitty setup"; return ;;
+  esac
+
+  # --- install ---
+  if command -v kitty >/dev/null 2>&1; then
+    ok "kitty present ($(kitty --version 2>/dev/null | head -n1))"
+  else
+    info "Installing kitty"
+    if [ "$OS" = "Darwin" ]; then
+      brew install --cask kitty || { warn "could not install kitty via brew; install it from https://sw.kovidgoyal.net/kitty/"; return; }
+    else
+      # Official curl installer — the only reliable cross-distro method.
+      curl -fL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n
+      # Expose the binary on PATH (the installer puts it in ~/.local/kitty.app on Linux).
+      if [ -x "$HOME/.local/kitty.app/bin/kitty" ]; then
+        $SUDO ln -sf "$HOME/.local/kitty.app/bin/kitty" /usr/local/bin/kitty 2>/dev/null \
+          || { mkdir -p "$HOME/.local/bin" && ln -sf "$HOME/.local/kitty.app/bin/kitty" "$HOME/.local/bin/kitty"; }
+      fi
+    fi
+    ok "kitty $(kitty --version 2>/dev/null | head -n1)"
+  fi
+
+  # --- config ---
+  local src="$NVIM_DIR/config/kitty.conf"
+  local dst="$HOME/.config/kitty/kitty.conf"
+  if [ -f "$src" ]; then
+    mkdir -p "$HOME/.config/kitty"
+    if [ -f "$dst" ] && ! grep -q 'nvim-lazy' "$dst" 2>/dev/null; then
+      local backup="${dst}.bak.$(date +%Y%m%d%H%M%S 2>/dev/null || echo manual)"
+      warn "existing kitty.conf detected — backing up to $backup"
+      cp "$dst" "$backup"
+    fi
+    cp "$src" "$dst"
+    ok "kitty config → $dst"
+  else
+    warn "config/kitty.conf not found in $NVIM_DIR; skipping config deploy"
+  fi
+
+  # --- set as default terminal (Linux only) ---
+  if [ "$OS" = "Linux" ]; then
+    local kitty_bin
+    kitty_bin="$(command -v kitty 2>/dev/null || echo "")"
+    if [ -n "$kitty_bin" ] && command -v update-alternatives >/dev/null 2>&1; then
+      $SUDO update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator "$kitty_bin" 50 2>/dev/null || true
+      $SUDO update-alternatives --set x-terminal-emulator "$kitty_bin" 2>/dev/null \
+        && ok "kitty set as default x-terminal-emulator" \
+        || warn "could not set kitty as default terminal; run: sudo update-alternatives --config x-terminal-emulator"
+    fi
+
+    # Desktop entry — lets GNOME/KDE app launchers and file managers open kitty.
+    local desktop_src="$HOME/.local/kitty.app/share/applications/kitty.desktop"
+    local desktop_dst="$HOME/.local/share/applications/kitty.desktop"
+    if [ -f "$desktop_src" ]; then
+      cp "$desktop_src" "$desktop_dst" 2>/dev/null || true
+    fi
+    # GNOME: set default terminal via gsettings if available.
+    if command -v gsettings >/dev/null 2>&1; then
+      gsettings set org.gnome.desktop.default-applications.terminal exec kitty 2>/dev/null \
+        && ok "set kitty as GNOME default terminal" || true
+    fi
+  else
+    info "macOS: set kitty as your default terminal in System Settings → Desktop & Dock → Default terminal app"
+  fi
+}
+
+# ----------------------------------------------------------------------------
 # the config repo
 # ----------------------------------------------------------------------------
 setup_config() {
@@ -773,6 +853,7 @@ main() {
   install_formatters
   install_tree_sitter_cli
   install_font         # JetBrainsMono Nerd Font (icons)
+  install_kitty        # kitty terminal (optional — prompts the user)
   setup_config
   sync_plugins
   printf '\n%s\n' "${GREEN}${BOLD}Done.${RESET} Launch with: ${BOLD}nvim${RESET}"
