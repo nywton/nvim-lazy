@@ -151,7 +151,15 @@ install_deps_macos() {
 # then falls back to the prebuilt GitHub release binary. macOS uses brew above.
 # ----------------------------------------------------------------------------
 install_tree_sitter_cli() {
-  command -v tree-sitter >/dev/null 2>&1 && { ok "tree-sitter CLI present ($(tree-sitter --version 2>/dev/null || echo unknown))"; return; }
+  # `tree-sitter build` (required by nvim-treesitter main) was added in v0.22.
+  # If the binary exists but is too old, fall through to upgrade it.
+  if command -v tree-sitter >/dev/null 2>&1 && tree-sitter build --help >/dev/null 2>&1; then
+    ok "tree-sitter CLI present ($(tree-sitter --version 2>/dev/null || echo unknown))"
+    return
+  fi
+  if command -v tree-sitter >/dev/null 2>&1; then
+    warn "tree-sitter $(tree-sitter --version 2>/dev/null) is too old (needs >= 0.22 for 'tree-sitter build'); upgrading"
+  fi
 
   if [ "$OS" = "Darwin" ]; then
     info "Installing tree-sitter CLI via Homebrew"
