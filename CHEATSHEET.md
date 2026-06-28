@@ -86,7 +86,7 @@ Toggles a reusable terminal — hiding it **keeps the session running** in the b
 | `<C-h>` / `<C-t>` | Next / prev marked file |
 
 ## Git
-**Gitsigns (hunks)** — `<leader>hs` stage · `<leader>hr` reset · `<leader>hS` stage buffer · `<leader>hu` undo stage · `<leader>hp` preview · `<leader>hb` blame line · `<leader>hd`/`<leader>hD` diff · `<leader>tb` toggle blame · `<leader>td` toggle deleted
+**Gitsigns (hunks)** — `]c`/`[c` next/prev changed hunk · `<leader>hs` stage · `<leader>hr` reset · `<leader>hS` stage buffer · `<leader>hu` undo stage · `<leader>hp` preview · `<leader>hb` blame line · `<leader>hd`/`<leader>hD` diff · `<leader>tb` toggle blame · `<leader>td` toggle deleted
 
 **Fugitive** — `<leader>gg` status · `<leader>gv` side-by-side diff · `<leader>gc` commit · `<leader>gC` amend · `<leader>ga` add file · `<leader>gu` discard file · `<leader>gU` unstage file · `<leader>gb` blame · `<leader>gl` log · `<leader>gp`/`<leader>gP` pull/push · `<leader>gF` fetch · `<leader>g1`/`<leader>g2` take ours/theirs · `<leader>gr` mergetool · `<leader>gD` 3-way conflict diff
 
