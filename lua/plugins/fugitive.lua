@@ -2,17 +2,15 @@ return {
 	"tpope/vim-fugitive",
 	cmd = { "Git", "Gvdiffsplit" }, -- Lazy-load only when running these commands
 	init = function()
-		-- In the Fugitive status buffer, make <CR> open the file in a split
-		-- and maximize it, so code takes the major part of the screen
-		-- (the status list stays as a thin strip; <C-w>w to jump back).
+		-- In the Fugitive status buffer, make <CR> open the file in a vertical split.
 		vim.api.nvim_create_autocmd("FileType", {
 			pattern = "fugitive",
 			callback = function()
-				vim.keymap.set("n", "<CR>", "o<C-w>_", {
+				vim.keymap.set("n", "<CR>", "gO", {
 					buffer = true,
 					remap = true,
 					silent = true,
-					desc = "Open file in maximized split",
+					desc = "Open file in vertical split",
 				})
 			end,
 		})
