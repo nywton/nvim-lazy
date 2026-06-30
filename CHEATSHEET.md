@@ -11,6 +11,16 @@ Leader is `<Space>`. Press `<leader>t` to fuzzy-search every keymap live.
 | `gx` | Open path/URL under cursor with system handler |
 | `<C-o>` / `<C-i>` | Jump back / forward (centered) |
 
+## Movement & search (auto-centered)
+Plain motions are remapped to keep the cursor vertically centered (`zz`) so you never lose context scrolling — same muscle memory, just less hunting for where the cursor landed.
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move down / up a line, centered |
+| `<C-d>` / `<C-u>` | Half-page down / up, centered |
+| `n` / `N` | Next / previous search match, centered |
+| `*` / `#` | Search word under cursor forward / backward, centered |
+| `G` | Go to end of file, centered |
+
 ## LSP (active only when a server is attached)
 | Key | Action |
 |-----|--------|
@@ -51,6 +61,7 @@ Leader is `<Space>`. Press `<leader>t` to fuzzy-search every keymap live.
 |-----|--------|
 | `jj` | Exit insert mode |
 | `;` | Enter command-line (`:`) |
+| `<leader>v` | Visual block mode (alt for `<C-v>`) |
 | `<leader>i` | Auto-indent whole file |
 | `J` / `K` (visual) | Move selection down / up |
 | `<leader>p` | Paste over selection without clobbering clipboard |

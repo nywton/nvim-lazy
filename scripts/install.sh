@@ -168,14 +168,19 @@ install_tree_sitter_cli() {
     return
   fi
 
-  # Try apt first — available in Ubuntu 24.04+ (noble) and later.
+  # Try apt first, but only keep it if it's actually new enough: Ubuntu noble's
+  # tree-sitter-cli package is stuck on 0.20.8 (pre-dates the `build` subcommand
+  # added in v0.22), so `apt-get install` exits 0 yet leaves a non-functional
+  # binary. Verify `tree-sitter build --help` before trusting it; otherwise fall
+  # through to the GitHub release below.
   if command -v apt-get >/dev/null 2>&1 && apt-cache show tree-sitter-cli >/dev/null 2>&1; then
     info "Installing tree-sitter-cli via apt"
-    if $SUDO apt-get install -y --no-install-recommends tree-sitter-cli; then
+    if $SUDO apt-get install -y --no-install-recommends tree-sitter-cli \
+      && tree-sitter build --help >/dev/null 2>&1; then
       ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)"
       return
     fi
-    warn "apt install tree-sitter-cli failed; falling back to GitHub release"
+    warn "apt's tree-sitter-cli $(tree-sitter --version 2>/dev/null || echo '(unknown)') is too old or failed to install; falling back to GitHub release"
   fi
 
   # Fall back to the prebuilt GitHub release binary (works on older Ubuntu too).
