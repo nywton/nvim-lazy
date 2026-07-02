@@ -112,8 +112,8 @@ vim.keymap.set(
 	{ desc = "Replace word under cursor" }
 )
 
--- Open lazy plugin config
-vim.keymap.set("n", "<leader>vpp", "<cmd>e ~/.config/nvim/lua/config/lazy.lua<CR>", { desc = "Edit lazy.lua" })
+-- Open cheatsheet
+vim.keymap.set("n", "<leader>vpp", "<cmd>e ~/.config/nvim/CHEATSHEET.md<CR>", { desc = "Open cheatsheet" })
 
 -- Open remap config
 vim.keymap.set("n", "<leader>km", "<cmd>e ~/.config/nvim/lua/config/remap.lua<CR>", { desc = "Edit remap.lua" })
