@@ -36,6 +36,7 @@ landed.
 | `[d` / `]d` | Previous / next diagnostic |
 | `<leader>E` | Line diagnostics float |
 | `<leader>Q` | Send diagnostics to loclist |
+| `<leader>lsp` | Toggle LSP on/off (saves resources) |
 
 ## Find (Telescope)
 | Key | Action |

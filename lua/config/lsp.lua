@@ -65,6 +65,18 @@ vim.lsp.config("ruby_lsp", {
 vim.lsp.enable({ "ruby_lsp" })
 
 -- ===============================
+-- Toggle: stop/start LSP clients on demand (e.g. to cut ruby-lsp's RSS on a
+-- loaded machine). Re-enabling reattaches to already-open buffers too.
+-- ===============================
+local lsp_servers = { "ruby_lsp" }
+
+vim.keymap.set("n", "<leader>lsp", function()
+	local enabling = not vim.lsp.is_enabled(lsp_servers[1])
+	vim.lsp.enable(lsp_servers, enabling)
+	vim.notify(enabling and "LSP enabled" or "LSP disabled", vim.log.levels.INFO)
+end, { desc = "Toggle LSP on/off" })
+
+-- ===============================
 -- Completion: the built-in 'autocomplete' option (nvim 0.12). The popup opens
 -- as you type; sources come from 'complete'. On LspAttach the buffer gets the
 -- LSP (omnifunc, "o") as the first source, then buffer words — the same mix
