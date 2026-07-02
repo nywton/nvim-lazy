@@ -177,21 +177,22 @@ Inside a `dv` side-by-side diff you can also merge selectively:
 | 3 | `<C-k>` / `<C-j>` | Walk file-by-file through the diff list |
 
 ### File history (Diffview)
-`<leader>gh` opens **DiffviewFileHistory** for the current file — a split with a commit log on the bottom and the diff on top.
+`<leader>gh` opens **DiffviewFileHistory** for the current file — commit log panel + diff panel.
 
 | Key | Action |
 |-----|--------|
 | `<leader>gh` | File history — current file |
 | `<leader>gH` | Repo-wide commit history |
-| `j` / `k` | Move between commits in the log panel |
-| `<CR>` | Toggle focus between log panel and diff panel |
-| `<Tab>` | Switch focus between log panel and diff panel |
-| `]q` / `[q` | Next / prev file changed in the selected commit |
-| `gf` | Open the file at that revision in a new buffer |
-| `y` | Copy the commit hash under cursor |
+| `<Tab>` / `<S-Tab>` | **Next / prev commit — moves cursor AND loads diff** (best for quick review) |
+| `j` / `k` | Move cursor in log panel only (does NOT update diff) |
+| `<CR>` | Open diff for commit under cursor |
+| `L` | Show full commit message/details |
+| `gf` | Open file at that revision in editor |
+| `y` | Copy commit hash |
+| `<C-f>` / `<C-b>` | Scroll the diff panel down / up |
 | `q` / `:DiffviewClose` | Close diffview |
 
-> Just move `j`/`k` through the log — the diff panel updates live as you land on each commit.
+> **Quick review loop:** `<leader>gh` → mash `<Tab>` to walk commits forward, `<S-Tab>` to go back — the diff loads automatically on each step. Use `<C-f>`/`<C-b>` to scroll a large diff without leaving the log.
 
 ### Quick comparisons
 | Key | Action |
