@@ -101,7 +101,9 @@ Toggles a reusable terminal — hiding it **keeps the session running** in the b
 ## Git
 **Gitsigns (hunks)** — `]c`/`[c` next/prev changed hunk · `<leader>hs` stage · `<leader>hr` reset · `<leader>hS` stage buffer · `<leader>hu` undo stage · `<leader>hp` preview · `<leader>hb` blame line · `<leader>hd`/`<leader>hD` diff · `<leader>tb` toggle blame · `<leader>td` toggle deleted
 
-**Fugitive** — `<leader>gg` status · `<leader>gv` side-by-side diff · `<leader>gh` file history → quickfix · `<leader>g-` diff vs HEAD~1 · `<leader>gM` diff vs origin/main · `<leader>gi` incoming commits · `<leader>gd` difftool all files vs upstream · `<leader>gc` commit · `<leader>gC` amend · `<leader>ga` add file · `<leader>gu` discard file · `<leader>gU` unstage file · `<leader>gb` blame · `<leader>gl` log · `<leader>gp`/`<leader>gP` pull/push · `<leader>gF` fetch · `<leader>g1`/`<leader>g2` take ours/theirs · `<leader>gr` mergetool · `<leader>gD` 3-way conflict diff
+**Fugitive** — `<leader>gg` status · `<leader>gv` side-by-side diff · `<leader>g-` diff vs HEAD~1 · `<leader>gM` diff vs origin/main · `<leader>gi` incoming commits · `<leader>gd` difftool all files vs upstream · `<leader>gc` commit · `<leader>gC` amend · `<leader>ga` add file · `<leader>gu` discard file · `<leader>gU` unstage file · `<leader>gb` blame · `<leader>gl` log · `<leader>gp`/`<leader>gP` pull/push · `<leader>gF` fetch · `<leader>g1`/`<leader>g2` take ours/theirs · `<leader>gr` mergetool · `<leader>gD` 3-way conflict diff
+
+**Diffview** — `<leader>gh` file history (current file) · `<leader>gH` repo-wide history
 
 ## Reviewing changes (VSCode-style side-by-side)
 
@@ -174,12 +176,22 @@ Inside a `dv` side-by-side diff you can also merge selectively:
 | 2 | `<leader>gd` | Load **all** files changed vs upstream into quickfix |
 | 3 | `<C-k>` / `<C-j>` | Walk file-by-file through the diff list |
 
-### File history
+### File history (Diffview)
+`<leader>gh` opens **DiffviewFileHistory** for the current file — a split with a commit log on the bottom and the diff on top.
+
 | Key | Action |
 |-----|--------|
-| `<leader>gh` | Load current file's **commit history** into quickfix |
-| `<C-k>` / `<C-j>` | Jump to next/prev revision of the file |
-| `<CR>` in log buffer | Open the commit diff |
+| `<leader>gh` | File history — current file |
+| `<leader>gH` | Repo-wide commit history |
+| `j` / `k` | Move between commits in the log panel |
+| `<CR>` | Toggle focus between log panel and diff panel |
+| `<Tab>` | Switch focus between log panel and diff panel |
+| `]q` / `[q` | Next / prev file changed in the selected commit |
+| `gf` | Open the file at that revision in a new buffer |
+| `y` | Copy the commit hash under cursor |
+| `q` / `:DiffviewClose` | Close diffview |
+
+> Just move `j`/`k` through the log — the diff panel updates live as you land on each commit.
 
 ### Quick comparisons
 | Key | Action |
