@@ -101,7 +101,7 @@ Toggles a reusable terminal — hiding it **keeps the session running** in the b
 ## Git
 **Gitsigns (hunks)** — `]c`/`[c` next/prev changed hunk · `<leader>hs` stage · `<leader>hr` reset · `<leader>hS` stage buffer · `<leader>hu` undo stage · `<leader>hp` preview · `<leader>hb` blame line · `<leader>hd`/`<leader>hD` diff · `<leader>tb` toggle blame · `<leader>td` toggle deleted
 
-**Fugitive** — `<leader>gg` status · `<leader>gv` side-by-side diff · `<leader>gc` commit · `<leader>gC` amend · `<leader>ga` add file · `<leader>gu` discard file · `<leader>gU` unstage file · `<leader>gb` blame · `<leader>gl` log · `<leader>gp`/`<leader>gP` pull/push · `<leader>gF` fetch · `<leader>g1`/`<leader>g2` take ours/theirs · `<leader>gr` mergetool · `<leader>gD` 3-way conflict diff
+**Fugitive** — `<leader>gg` status · `<leader>gv` side-by-side diff · `<leader>gh` file history → quickfix · `<leader>g-` diff vs HEAD~1 · `<leader>gM` diff vs origin/main · `<leader>gi` incoming commits · `<leader>gd` difftool all files vs upstream · `<leader>gc` commit · `<leader>gC` amend · `<leader>ga` add file · `<leader>gu` discard file · `<leader>gU` unstage file · `<leader>gb` blame · `<leader>gl` log · `<leader>gp`/`<leader>gP` pull/push · `<leader>gF` fetch · `<leader>g1`/`<leader>g2` take ours/theirs · `<leader>gr` mergetool · `<leader>gD` 3-way conflict diff
 
 ## Reviewing changes (VSCode-style side-by-side)
 
@@ -155,6 +155,42 @@ Inside a `dv` side-by-side diff you can also merge selectively:
 **Quick loop:** `<leader>gg` → land on a file → `=` to peek (or `dv` for full side-by-side) → `]c`/`[c` through hunks → `s` to stage the good ones (`X` to discard, `u` to unstage) → `cc` to commit.
 
 **Review against another revision:** `:Gvdiffsplit HEAD~1` · `:Gvdiffsplit main` · or `:Git difftool -y main` to load every changed file vs `main` into the quickfix-style diff list.
+
+## Reviewing committed changes (office repo / PR review)
+
+### Workflow: see what's new in the remote
+| Step | Key | Action |
+|------|-----|--------|
+| 1 | `<leader>gF` | Fetch remote (update `origin/*` refs) |
+| 2 | `<leader>gi` | Show commits in upstream not yet in HEAD — opens a log buffer |
+| 3 | `<CR>` on any commit | Open that commit's full diff (Fugitive object view) |
+| 4 | `]c` / `[c` | Jump between hunks inside the commit diff |
+| 5 | `<C-o>` | Return to the log buffer |
+
+### Workflow: systematic file-by-file review vs upstream
+| Step | Key | Action |
+|------|-----|--------|
+| 1 | `<leader>gF` | Fetch |
+| 2 | `<leader>gd` | Load **all** files changed vs upstream into quickfix |
+| 3 | `<C-k>` / `<C-j>` | Walk file-by-file through the diff list |
+
+### File history
+| Key | Action |
+|-----|--------|
+| `<leader>gh` | Load current file's **commit history** into quickfix |
+| `<C-k>` / `<C-j>` | Jump to next/prev revision of the file |
+| `<CR>` in log buffer | Open the commit diff |
+
+### Quick comparisons
+| Key | Action |
+|-----|--------|
+| `<leader>gv` | Diff current file vs index/HEAD (working-tree review) |
+| `<leader>g-` | Diff current file vs **previous commit** (HEAD~1) |
+| `<leader>gM` | Diff current file vs **upstream** (origin/main) |
+| `]c` / `[c` | Jump hunks in any open diff |
+| `<C-w>w` / `<leader><Tab>` | Switch between the two diff panes |
+
+> `<leader>gi` and `<leader>gM` and `<leader>gd` auto-detect your branch's upstream (`@{u}`), falling back to `origin/main`.
 
 ## Useful commands
 `:LspInfo` check attached clients · `:Lazy` plugin manager · `:checkhealth` diagnose setup

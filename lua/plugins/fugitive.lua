@@ -1,6 +1,6 @@
 return {
 	"tpope/vim-fugitive",
-	cmd = { "Git", "Gvdiffsplit" }, -- Lazy-load only when running these commands
+	cmd = { "Git", "Gvdiffsplit", "Gclog" }, -- Lazy-load only when running these commands
 	init = function()
 		-- In the Fugitive status buffer, make <CR> open the file in a vertical split.
 		vim.api.nvim_create_autocmd("FileType", {
@@ -26,6 +26,44 @@ return {
 		-- Git basic
 		{ "<leader>gb", "<cmd>Git blame<CR>", desc = "Git blame" },
 		{ "<leader>gl", "<cmd>Git log<CR>", desc = "Git log -p" },
+
+		-- History & compare
+		-- File history → quickfix; then <C-k>/<C-j> walk through every revision
+		{ "<leader>gh", "<cmd>0Gclog<CR>", desc = "File history → quickfix" },
+		-- Side-by-side diff vs previous commit (HEAD~1)
+		{ "<leader>g-", "<cmd>Gvdiffsplit HEAD~1<CR>", desc = "Diff vs HEAD~1" },
+		-- Side-by-side diff vs origin/main (or detected upstream)
+		{
+			"<leader>gM",
+			function()
+				local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+				local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
+				vim.cmd("Gvdiffsplit " .. ref)
+			end,
+			desc = "Diff vs upstream (origin/main)",
+		},
+
+		-- Review incoming commits
+		-- Shows commits in upstream not yet in HEAD (run <leader>gF first to fetch)
+		{
+			"<leader>gi",
+			function()
+				local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+				local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
+				vim.cmd("Git log HEAD.." .. ref .. " --oneline")
+			end,
+			desc = "Incoming commits (unpulled)",
+		},
+		-- Load every file changed vs upstream into a quickfix diff list → <C-k>/<C-j> to review each
+		{
+			"<leader>gd",
+			function()
+				local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+				local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
+				vim.cmd("Git difftool -y " .. ref)
+			end,
+			desc = "Difftool all changed files vs upstream → C-k/C-j",
+		},
 
 		-- Git workflow
 		-- { "<leader>gs", "<cmd>Git status<CR>", desc = "Git status" },
