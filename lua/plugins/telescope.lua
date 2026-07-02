@@ -9,7 +9,11 @@ return {
     cmd = "Telescope", -- load only when :Telescope is called
     keys = {
       { "<C-f>", "<cmd>Telescope git_files<CR>", desc = "Git files" },
-      { "<C-p>", "<cmd>Telescope find_files<CR>", desc = "Search all files" },
+      { "<C-p>", function()
+        local root = vim.fn.systemlist("git rev-parse --show-toplevel")[1]
+        if vim.v.shell_error ~= 0 then root = vim.fn.getcwd() end
+        require("telescope.builtin").find_files({ cwd = root })
+      end, desc = "Search all files from project root" },
       { "<leader>t", "<cmd>Telescope keymaps<CR>", desc = "Search all keymaps" },
       { "<leader>gs", "<cmd>Telescope git_status<CR>", desc = "Git status" },
       { "<leader>h", "<cmd>Telescope help_tags<CR>", desc = "Help tags" },
