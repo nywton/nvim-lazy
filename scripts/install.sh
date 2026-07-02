@@ -138,7 +138,7 @@ install_deps_linux() {
   $SUDO apt-get install -y --no-install-recommends \
     ca-certificates curl git unzip tar locales \
     build-essential cmake ninja-build gettext pkg-config \
-    ripgrep fd-find \
+    ripgrep fd-find universal-ctags \
     python3 python3-pip python3-venv \
     $gui_pkgs
   # Debian/Ubuntu ship fd as `fdfind`; expose the conventional `fd` name.
@@ -172,7 +172,7 @@ install_deps_macos() {
   # tree-sitter is the CLI that nvim-treesitter's `main` branch shells out to
   # when compiling parsers (`tree-sitter build`).
   # rbenv + ruby-build provide the Ruby toolchain (see install_ruby).
-  brew install neovim git curl cmake ninja ripgrep fd stylua tree-sitter rbenv ruby-build || true
+  brew install neovim git curl cmake ninja ripgrep fd stylua tree-sitter rbenv ruby-build universal-ctags || true
   ok "$(nvim --version | head -n1)"
 }
 

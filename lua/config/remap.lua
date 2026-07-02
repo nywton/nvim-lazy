@@ -158,6 +158,14 @@ else
 	end, { desc = "Copy absolute path" })
 end
 
+-- ctags/ripgrep fallback for gd/gr — LspAttach (lsp.lua) overrides these
+-- buffer-locally when a language server is attached; LspDetach removes that
+-- override so these globals take back over the moment LSP is off.
+vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (ctags)" })
+vim.keymap.set("n", "gr", function()
+	require("telescope.builtin").grep_string({ word_match = "-w" })
+end, { desc = "Find references (ripgrep)" })
+
 -- Repo-wide git hunk navigation (no gitsigns dependency)
 local function get_all_hunks()
 	local git_root = vim.trim(vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"))

@@ -136,3 +136,14 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		map("n", "<leader>Q", vim.diagnostic.setloclist, "Diagnostics to loclist")
 	end,
 })
+
+-- When a client detaches (buffer close, or the <leader>lsp toggle above),
+-- drop the buffer-local overrides so gd/gr fall back to the global
+-- ctags/telescope mappings in remap.lua instead of erroring with no client.
+vim.api.nvim_create_autocmd("LspDetach", {
+	callback = function(args)
+		for _, lhs in ipairs({ "gd", "gr", "gi" }) do
+			pcall(vim.keymap.del, "n", lhs, { buffer = args.buf })
+		end
+	end,
+})
