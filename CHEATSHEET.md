@@ -160,7 +160,38 @@ Inside a `dv` side-by-side diff you can also merge selectively:
 
 ## Reviewing committed changes (office repo / PR review)
 
-### Workflow: see what's new in the remote
+### 🌅 Morning review — what changed in the last pull
+
+Two modes depending on how you want to browse:
+
+| Key | Mode | Best for |
+|-----|------|----------|
+| `<leader>go` | **File-panel view** — all changed files listed on the left, diff on the right | Quickly scanning which files changed and jumping between hunks |
+| `<leader>gO` | **Commit-list view** — each commit listed, Tab walks commit by commit | Understanding *what each commit did*, reading history |
+
+#### `<leader>go` — file-panel (all changes at once)
+After `git pull`, opens `DiffviewOpen ORIG_HEAD` (falls back to upstream if no ORIG_HEAD):
+| Key | Action |
+|-----|--------|
+| `<Tab>` / `<S-Tab>` | **Next / prev changed file** (loads its diff instantly) |
+| `j` / `k` | Move cursor in file list only |
+| `]c` / `[c` | Next / prev **hunk** within the current file diff |
+| `<C-f>` / `<C-b>` | Scroll diff down / up |
+| `q` / `:DiffviewClose` | Close |
+
+#### `<leader>gO` — commit-list (commit by commit)
+Opens `DiffviewFileHistory --range=ORIG_HEAD..HEAD` — same Tab navigation as file history:
+| Key | Action |
+|-----|--------|
+| `<Tab>` / `<S-Tab>` | **Next / prev commit** — loads that commit's diff |
+| `j` / `k` | Move cursor in commit list only |
+| `L` | Show full commit message |
+| `<C-f>` / `<C-b>` | Scroll diff |
+| `q` / `:DiffviewClose` | Close |
+
+> **Morning loop:** `<leader>gp` (pull) → `<leader>gO` for commit-by-commit overview → `<leader>go` to deep-dive into specific files with hunk navigation.
+
+### Workflow: see what's new in the remote (before pulling)
 | Step | Key | Action |
 |------|-----|--------|
 | 1 | `<leader>gF` | Fetch remote (update `origin/*` refs) |
