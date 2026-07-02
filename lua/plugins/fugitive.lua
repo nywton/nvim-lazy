@@ -28,8 +28,6 @@ return {
 		{ "<leader>gl", "<cmd>Git log<CR>", desc = "Git log -p" },
 
 		-- History & compare
-		-- File history → quickfix; then <C-k>/<C-j> walk through every revision
-		{ "<leader>gh", "<cmd>0Gclog<CR>", desc = "File history → quickfix" },
 		-- Side-by-side diff vs previous commit (HEAD~1)
 		{ "<leader>g-", "<cmd>Gvdiffsplit HEAD~1<CR>", desc = "Diff vs HEAD~1" },
 		-- Side-by-side diff vs origin/main (or detected upstream)
