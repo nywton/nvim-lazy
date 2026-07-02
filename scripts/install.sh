@@ -392,16 +392,16 @@ install_tmux() {
     fi
   fi
 
-  # --- ~/.config/tmux/stats.sh — the status-bar stats helper (cpu/gpu/ram/disk)
-  # referenced by status-right below. Always (re)written so updates propagate;
-  # it's a generated helper, not user-editable config. No external deps.
+  # --- ~/.config/tmux/stats.sh — the status-bar stats helper
+  # (cpu / gpu_seg / ram / disk / net / ip). Always (re)written so updates
+  # propagate; it's a generated helper, not user-editable config. No external deps.
   local stats="$HOME/.config/tmux/stats.sh"
   info "Writing $stats"
   mkdir -p "$(dirname "$stats")"
   cat > "$stats" <<'STATSSH'
 #!/usr/bin/env bash
 # Lightweight system stats for the tmux status bar (macOS + Linux).
-# Usage: stats.sh <cpu|gpu|ram|disk>
+# Usage: stats.sh <cpu|gpu_seg|ram|disk|net|ip>
 # No external dependencies / plugins — only built-in OS tools.
 
 os="$(uname -s)"
@@ -426,19 +426,20 @@ cpu() {
   fi
 }
 
-gpu() {
+# Returns "GPU XX%  " (with trailing separator) when a GPU is detected, or
+# empty string when no GPU is present — callers omit the segment entirely.
+gpu_seg() {
+  local v=""
   if [ "$os" = "Darwin" ]; then
-    # Apple Silicon GPU utilization from IOKit
-    ioreg -r -d 1 -w 0 -c AGXAccelerator 2>/dev/null \
+    v=$(ioreg -r -d 1 -w 0 -c AGXAccelerator 2>/dev/null \
       | grep -o '"Device Utilization %"=[0-9]*' \
       | head -1 \
-      | awk -F= '{ printf "%d%%", $2 }'
+      | awk -F= '{ printf "%d%%", $2 }')
   elif command -v nvidia-smi >/dev/null 2>&1; then
-    nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
-      | head -1 | awk '{ printf "%d%%", $1 }'
-  else
-    printf "n/a"
+    v=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
+      | head -1 | awk '{ printf "%d%%", $1 }')
   fi
+  [ -n "$v" ] && printf 'GPU %s  ' "$v"
 }
 
 ram() {
@@ -468,6 +469,44 @@ disk() {
   df -h "$mount" | awk 'NR==2 { gsub(/Gi/, "G", $2); gsub(/Gi/, "G", $3); printf "%s/%s", $3, $2 }'
 }
 
+# Network RX/TX rate for the primary non-loopback interface.
+# Outputs "↓X.XM ↑X.XM" using KB/s or MB/s units. Samples over ~1 second.
+# On VPS/servers this is the most actionable real-time metric.
+net() {
+  if [ "$os" = "Darwin" ]; then
+    local iface
+    iface=$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')
+    [ -z "$iface" ] && iface="en0"
+    local s1 s2
+    s1=$(netstat -ibn 2>/dev/null | awk -v i="$iface" '$1==i && /Link/ { print $7, $10; exit }')
+    sleep 1
+    s2=$(netstat -ibn 2>/dev/null | awk -v i="$iface" '$1==i && /Link/ { print $7, $10; exit }')
+    awk -v s1="$s1" -v s2="$s2" 'BEGIN {
+      split(s1, a, " "); split(s2, b, " ")
+      rx = b[1]-a[1]; tx = b[2]-a[2]
+      if (rx >= 1048576) printf "↓%.1fM", rx/1048576; else printf "↓%.0fK", rx/1024
+      if (tx >= 1048576) printf " ↑%.1fM", tx/1048576; else printf " ↑%.0fK", tx/1024
+    }'
+  else
+    # Find primary non-loopback interface via the default route.
+    local iface
+    iface=$(ip route 2>/dev/null | awk '/^default/ { print $5; exit }')
+    [ -z "$iface" ] && iface=$(awk 'NR>2 { gsub(/:/, "", $1); if ($1 != "lo") { print $1; exit } }' /proc/net/dev)
+    [ -z "$iface" ] && { printf "n/a"; return; }
+    local r1 t1 r2 t2
+    r1=$(awk -v i="${iface}:" '$1==i { print $2 }' /proc/net/dev)
+    t1=$(awk -v i="${iface}:" '$1==i { print $10 }' /proc/net/dev)
+    sleep 1
+    r2=$(awk -v i="${iface}:" '$1==i { print $2 }' /proc/net/dev)
+    t2=$(awk -v i="${iface}:" '$1==i { print $10 }' /proc/net/dev)
+    awk -v r1="$r1" -v t1="$t1" -v r2="$r2" -v t2="$t2" 'BEGIN {
+      rx = r2-r1; tx = t2-t1
+      if (rx >= 1048576) printf "↓%.1fM", rx/1048576; else printf "↓%.0fK", rx/1024
+      if (tx >= 1048576) printf " ↑%.1fM", tx/1048576; else printf " ↑%.0fK", tx/1024
+    }'
+  fi
+}
+
 # Primary LAN IPv4. Named ipaddr() so it never shadows the `ip` command.
 ipaddr() {
   local a=""
@@ -483,11 +522,12 @@ ipaddr() {
 }
 
 case "$1" in
-  cpu)  cpu    ;;
-  gpu)  gpu    ;;
-  ram)  ram    ;;
-  disk) disk   ;;
-  ip)   ipaddr ;;
+  cpu)     cpu     ;;
+  gpu_seg) gpu_seg ;;
+  ram)     ram     ;;
+  disk)    disk    ;;
+  net)     net     ;;
+  ip)      ipaddr  ;;
 esac
 STATSSH
   chmod +x "$stats"
@@ -621,9 +661,10 @@ TMUXCONF
 # iTerm2, WezTerm, Ghostty, Windows Terminal all do).
 set -s set-clipboard on
 set -g status-interval 5
-set -g status-right-length 160
-# system stats (cpu/gpu/ram/disk + IP via ~/.config/tmux/stats.sh) + user@host + clock
-set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]GPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh gpu)  #[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#F9E2AF]#(whoami)@#H #[fg=#94E2D5]#(~/.config/tmux/stats.sh ip)  #[fg=#6C7086]%H:%M  %d %b "
+set -g status-right-length 180
+# system stats via ~/.config/tmux/stats.sh:
+#   cpu / gpu_seg (hidden when no GPU) / ram / disk / net (↓RX ↑TX) / ip + clock
+set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]#(~/.config/tmux/stats.sh gpu_seg)#[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#74C7EC]NET #[fg=#CDD6F4]#(~/.config/tmux/stats.sh net)  #[fg=#F9E2AF]#(whoami)@#H #[fg=#94E2D5]#(~/.config/tmux/stats.sh ip)  #[fg=#6C7086]%H:%M  %d %b "
 # <<< nvim-lazy tmux stats <<<
 TMUXSTATS
   mv "$tmp" "$rc"
