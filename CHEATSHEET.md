@@ -12,7 +12,9 @@ Leader is `<Space>`. Press `<leader>t` to fuzzy-search every keymap live.
 | `<C-o>` / `<C-i>` | Jump back / forward (centered) |
 
 ## Movement & search (auto-centered)
-Plain motions are remapped to keep the cursor vertically centered (`zz`) so you never lose context scrolling — same muscle memory, just less hunting for where the cursor landed.
+Plain motions are remapped to keep the cursor vertically centered (`zz`) 
+so you never lose context scrolling — same muscle memory, just less hunting for where the cursor 
+landed.
 | Key | Action |
 |-----|--------|
 | `j` / `k` | Move down / up a line, centered |
