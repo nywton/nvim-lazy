@@ -180,14 +180,25 @@ After `git pull`, opens `DiffviewOpen ORIG_HEAD` (falls back to upstream if no O
 | `q` / `:DiffviewClose` | Close |
 
 #### `<leader>gO` — commit-list (commit by commit)
-Opens `DiffviewFileHistory --range=ORIG_HEAD..HEAD` — same Tab navigation as file history:
+Opens `DiffviewFileHistory --range=ORIG_HEAD..HEAD` — commit log + diff panel:
 | Key | Action |
 |-----|--------|
 | `<Tab>` / `<S-Tab>` | **Next / prev commit** — loads that commit's diff |
-| `j` / `k` | Move cursor in commit list only |
+| `j` / `k` | Move cursor in commit list only (no diff update) |
+| `<C-A-d>` | **Drill into commit** → opens it in DiffviewOpen with full file list |
 | `L` | Show full commit message |
 | `<C-f>` / `<C-b>` | Scroll diff |
 | `q` / `:DiffviewClose` | Close |
+
+Once inside a commit via `<C-A-d>` (DiffviewOpen):
+| Key | Action |
+|-----|--------|
+| `<Tab>` / `<S-Tab>` | **Next / prev file** changed in that commit |
+| `]c` / `[c` | Next / prev **hunk** within the file |
+| `<C-f>` / `<C-b>` | Scroll diff |
+| `q` | Close and return |
+
+> **Full drill-down:** `<leader>gO` → `<Tab>` through commits → `<C-A-d>` to expand a commit → `<Tab>` through its files → `]c`/`[c` through hunks.
 
 > **Morning loop:** `<leader>gp` (pull) → `<leader>gO` for commit-by-commit overview → `<leader>go` to deep-dive into specific files with hunk navigation.
 
