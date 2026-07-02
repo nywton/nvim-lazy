@@ -87,7 +87,38 @@ if vim.fn.has("wsl") == 1 then
 		},
 		cache_enabled = 0,
 	}
+elseif vim.fn.has("linux") == 1 and not (vim.env.DISPLAY or vim.env.WAYLAND_DISPLAY) then
+	-- =====================
+	-- Headless Linux (Ubuntu server over SSH, docker): OSC 52 clipboard
+	-- =====================
+	-- No X/Wayland means no xclip/wl-clipboard — "+ yanks travel as OSC 52
+	-- escape codes through the terminal (and tmux's set-clipboard passthrough)
+	-- to the LOCAL machine's clipboard instead. Neovim only auto-picks OSC 52
+	-- when $SSH_TTY is set; forcing it also covers docker exec and consoles.
+	-- "+p needs a terminal that answers OSC 52 queries (kitty does);
+	-- terminal-native paste always works.
+	g.clipboard = "osc52"
+
+	-- gx / :Open can't launch a browser here — copy the URL to the local
+	-- clipboard (via OSC 52 above) and say so instead. vim.ui.open is the
+	-- documented override point; _get_open_cmd is patched to match so
+	-- :checkhealth reports the handler that is actually in effect.
+	vim.ui.open = function(path)
+		vim.fn.setreg("+", path)
+		vim.notify("Copied to local clipboard: " .. path)
+		return nil, nil
+	end
+	vim.ui._get_open_cmd = function()
+		return { "osc52-copy-to-local-clipboard" }, nil
+	end
 end
+
+-- =====================
+-- Filetypes core doesn't detect
+-- =====================
+-- Neovim has no built-in detection for .slim, so without this the installed
+-- slim treesitter parser never activates (FileType never fires).
+vim.filetype.add({ extension = { slim = "slim" } })
 
 -- =====================
 -- rbenv on PATH

@@ -81,7 +81,9 @@ Already cloned? Update in place:
 
 Every step is **idempotent** — re-run any time to update; already-installed pieces are just checked/updated.
 
-Override defaults with env vars: `REPO_URL`, `NVIM_DIR`, `RUBY_VERSION` (default `3.4.9`), `NO_SYNC=1`, `NO_RUBY=1`, `NO_SHELL=1`, `NO_TMUX=1`, `NO_FONT=1`.
+On a **headless server** (Linux with no `$DISPLAY`/`$WAYLAND_DISPLAY` — e.g. Ubuntu over SSH) the script automatically skips the GUI extras: kitty, the Nerd Font, and the `xclip`/`wl-clipboard`/`fontconfig` packages. Force this mode with `SERVER=1`, or opt back into the GUI bits with `SERVER=0`. Clipboard still works over SSH: Neovim falls back to [OSC 52](https://neovim.io/doc/user/provider.html#clipboard-osc52) (yanks land in your *local* clipboard), and the installer's tmux block sets `set-clipboard on` so it passes through tmux — your local terminal just needs OSC 52 support (kitty, iTerm2, WezTerm, Ghostty, Windows Terminal).
+
+Override defaults with env vars: `REPO_URL`, `NVIM_DIR`, `RUBY_VERSION` (default `3.4.9`), `NO_SYNC=1`, `NO_RUBY=1`, `NO_SHELL=1`, `NO_TMUX=1`, `NO_FONT=1`, `NO_KITTY=1`, `SERVER=1`.
 </details>
 
 ### Docker — disposable, batteries-included

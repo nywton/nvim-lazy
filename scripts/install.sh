@@ -20,6 +20,9 @@
 #   NO_FONT=1      skip the Nerd Font install     (default: unset → installs)
 #   NO_TMUX=1      skip tmux + ~/.tmux.conf setup (default: unset → installs)
 #   NO_KITTY=1     skip kitty terminal setup      (default: unset → prompts)
+#   SERVER=1       headless-server mode: skip GUI extras (kitty, Nerd Font,
+#                  X/Wayland clipboard tools). Auto-detected on Linux when no
+#                  $DISPLAY/$WAYLAND_DISPLAY is set; force off with SERVER=0.
 #
 set -euo pipefail
 
@@ -68,6 +71,24 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 # ----------------------------------------------------------------------------
+# Headless-server detection — on a display-less Linux box (typical Ubuntu
+# server) the GUI bits are dead weight: kitty, the Nerd Font and the X/Wayland
+# clipboard tools all need a display. Auto-detected from $DISPLAY /
+# $WAYLAND_DISPLAY; force with SERVER=1, opt back in with SERVER=0.
+# ----------------------------------------------------------------------------
+HEADLESS=""
+if [ "${SERVER:-}" = "1" ]; then
+  HEADLESS=1
+elif [ "${SERVER:-}" != "0" ] && [ "$OS" = "Linux" ] \
+  && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  HEADLESS=1
+fi
+if [ -n "$HEADLESS" ]; then
+  NO_KITTY=1
+  NO_FONT=1
+fi
+
+# ----------------------------------------------------------------------------
 # Neovim  (latest stable, from the official GitHub release tarball/brew)
 # ----------------------------------------------------------------------------
 install_nvim_linux() {
@@ -109,14 +130,17 @@ install_deps_linux() {
   # (no biome/Node). python3/pip back the black formatter.
   # xclip / wl-clipboard back the "+/"* registers (system clipboard) so
   # :checkhealth doesn't warn "No clipboard tool found". locales lets us
-  # generate a UTF-8 locale below.
+  # generate a UTF-8 locale below. GUI-only packages (clipboard tools need an
+  # X/Wayland display, fontconfig only serves the Nerd Font) are dropped in
+  # headless-server mode.
+  local gui_pkgs="xclip wl-clipboard fontconfig"
+  [ -n "$HEADLESS" ] && gui_pkgs=""
   $SUDO apt-get install -y --no-install-recommends \
     ca-certificates curl git unzip tar locales \
     build-essential cmake ninja-build gettext pkg-config \
     ripgrep fd-find \
-    xclip wl-clipboard \
-    fontconfig \
-    python3 python3-pip python3-venv
+    python3 python3-pip python3-venv \
+    $gui_pkgs
   # Debian/Ubuntu ship fd as `fdfind`; expose the conventional `fd` name.
   if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
     $SUDO ln -sf "$(command -v fdfind)" /usr/local/bin/fd
@@ -125,6 +149,14 @@ install_deps_linux() {
   if command -v locale-gen >/dev/null 2>&1; then
     $SUDO sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || true
     $SUDO locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
+  fi
+  # Generating the locale isn't enough — LANG must also point at it, or
+  # minimal servers (LANG unset) still hit the checkhealth UTF-8 ERROR.
+  # update-locale persists it in /etc/default/locale for future SSH logins;
+  # the export covers the rest of this script run (headless plugin sync).
+  if ! locale 2>/dev/null | grep -qiE '^LANG=.*utf-?8'; then
+    command -v update-locale >/dev/null 2>&1 && $SUDO update-locale LANG=en_US.UTF-8 2>/dev/null || true
+    export LANG=en_US.UTF-8
   fi
   install_nvim_linux
 }
@@ -583,6 +615,11 @@ TMUXCONF
   cat >> "$tmp" <<'TMUXSTATS'
 
 # >>> nvim-lazy tmux stats >>>  (managed block — remove the whole block to undo)
+# OSC 52 clipboard passthrough: lets nvim (and copy-mode y) reach the LOCAL
+# machine's clipboard through SSH — required on headless servers where there
+# is no X/Wayland clipboard tool. Your terminal must support OSC 52 (kitty,
+# iTerm2, WezTerm, Ghostty, Windows Terminal all do).
+set -s set-clipboard on
 set -g status-interval 5
 set -g status-right-length 160
 # system stats (cpu/gpu/ram/disk + IP via ~/.config/tmux/stats.sh) + user@host + clock
@@ -868,6 +905,7 @@ sync_plugins() {
 # ----------------------------------------------------------------------------
 main() {
   printf '%s\n' "${BOLD}nvim-lazy installer${RESET}  ($OS/$ARCH)"
+  [ -n "$HEADLESS" ] && info "headless server detected → skipping GUI extras (kitty, Nerd Font, clipboard tools); force GUI setup with SERVER=0"
   case "$OS" in
     Linux)  install_deps_linux ;;
     Darwin) install_deps_macos ;;
