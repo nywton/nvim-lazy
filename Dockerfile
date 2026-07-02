@@ -6,8 +6,8 @@
 #   docker run -it --rm -v "$PWD:/work" neo-nvim        # drops you into zsh
 #   docker run -it --rm -v "$PWD:/work" neo-nvim nvim   # straight into Neovim
 #
-# Debian-slim (glibc) is used on purpose: mason's prebuilt LSP servers and
-# blink.cmp's fuzzy binary are glibc builds and break on musl/alpine.
+# Debian-slim (glibc) is used on purpose: the prebuilt Neovim / stylua /
+# tree-sitter release binaries are glibc builds and break on musl/alpine.
 # Trixie (glibc 2.41) over bookworm (2.36): the prebuilt tree-sitter CLI is now
 # linked against GLIBC_2.39 and won't run on bookworm.
 FROM debian:trixie-slim
@@ -20,7 +20,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # --- system packages -------------------------------------------------------
 # Build chain (treesitter parsers compile from C), search tools (ripgrep, the
-# silver searcher, fd), zsh + tmux, and Python (for jedi-language-server).
+# silver searcher, fd), zsh + tmux, and Python (for the black formatter).
 # No nodejs/npm — this config is deliberately Node-free.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git unzip tar locales \
@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-venv \
     && ln -sf "$(command -v fdfind)" /usr/local/bin/fd \
     && rm -rf /var/lib/apt/lists/*
+
+# black backs conform.nvim's python formatting.
+RUN pip3 install --no-cache-dir --break-system-packages black
 
 # --- Neovim (official release tarball, latest stable) ----------------------
 RUN set -eux; \

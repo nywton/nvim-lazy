@@ -155,4 +155,4 @@ Inside a `dv` side-by-side diff you can also merge selectively:
 **Review against another revision:** `:Gvdiffsplit HEAD~1` · `:Gvdiffsplit main` · or `:Git difftool -y main` to load every changed file vs `main` into the quickfix-style diff list.
 
 ## Useful commands
-`:Mason` install/manage LSP servers · `:LspInfo` check attached clients · `:Lazy` plugin manager · `:checkhealth` diagnose setup
+`:LspInfo` check attached clients · `:Lazy` plugin manager · `:checkhealth` diagnose setup

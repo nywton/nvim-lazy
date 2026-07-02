@@ -93,8 +93,8 @@ end
 -- rbenv on PATH
 -- =====================
 -- rbenv's `init` only runs in interactive shells, so a GUI/desktop launch (or
--- a shell started before install) leaves Neovim without `ruby`/`gem`. Mason
--- then fails to build ruby-lsp ("Could not find executable gem in PATH").
+-- a shell started before install) leaves Neovim without `ruby`/`gem` — and
+-- with them the `ruby-lsp` and `rubocop` binaries this config expects on PATH.
 -- Prepend the shims here so Ruby is visible however Neovim was started.
 local rbenv_shims = vim.fn.expand("~/.rbenv/shims")
 if vim.fn.isdirectory(rbenv_shims) == 1 and not string.find(vim.env.PATH or "", rbenv_shims, 1, true) then
@@ -104,8 +104,8 @@ end
 -- =====================
 -- Language providers
 -- =====================
--- This config is deliberately Node-free and edits code through LSPs
--- (jedi/ruby_lsp), not Neovim's remote-plugin hosts. None of the installed
+-- This config is deliberately Node-free and edits code through an LSP
+-- (ruby_lsp), not Neovim's remote-plugin hosts. None of the installed
 -- plugins need these providers, so disable them to silence the optional
 -- :checkhealth warnings (node/perl/python3/ruby).
 g.loaded_node_provider = 0

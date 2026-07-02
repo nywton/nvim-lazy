@@ -55,11 +55,11 @@ check("stylua (lua formatter)", vim.fn.executable("stylua") == 1)
 -- it — the suite passes with no JS runtime present (proven in the container/CI).
 print(string.format("info - node on PATH: %s (not used by this config)",
   vim.fn.executable("node") == 1 and "yes" or "no"))
--- Mason-managed binaries (jedi) and gem/pip formatters are optional at test
--- time — they install on first use, so report without failing.
+-- LSP servers and gem/pip formatters are host-dependent (installed by
+-- scripts/install.sh, not by any plugin), so report without failing.
 -- (JS/TS/HTML/CSS/ERB are formatted dependency-free via Treesitter re-indent;
 -- see lua/config/tsformat.lua. No biome / Node tooling is involved.)
-soft("jedi-language-server (python lsp, via mason)", vim.fn.executable("jedi-language-server") == 1)
+soft("ruby-lsp (ruby lsp, via gem)", vim.fn.executable("ruby-lsp") == 1)
 soft("black (python formatter)", vim.fn.executable("black") == 1)
 soft("rubocop (ruby formatter)", vim.fn.executable("rubocop") == 1)
 soft("the silver searcher (ag)", vim.fn.executable("ag") == 1)
@@ -71,8 +71,8 @@ for _, p in ipairs(require("lazy").plugins()) do
   registered[p.name] = true
 end
 local expected = {
-  "lazy.nvim", "mason.nvim", "mason-lspconfig.nvim", "nvim-lspconfig",
-  "blink.cmp", "nvim-treesitter", "nvim-ts-autotag", "conform.nvim",
+  "lazy.nvim",
+  "nvim-treesitter", "nvim-ts-autotag", "conform.nvim",
   "telescope.nvim", "plenary.nvim", "harpoon", "vim-fugitive",
   "gitsigns.nvim", "lualine.nvim", "catppuccin", "nvim-autopairs",
   "nvim-colorizer.lua", "indent-blankline.nvim",
@@ -92,14 +92,14 @@ check("<leader>s -> live_grep", vim.fn.maparg("<leader>s", "n") ~= "")
 
 print("# force-load lazy plugins and require their modules")
 local to_load = {
-  "telescope.nvim", "blink.cmp", "nvim-treesitter", "conform.nvim",
-  "mason.nvim", "nvim-lspconfig", "gitsigns.nvim", "lualine.nvim",
+  "telescope.nvim", "nvim-treesitter", "conform.nvim",
+  "gitsigns.nvim", "lualine.nvim",
 }
 pcall(function() require("lazy").load({ plugins = to_load }) end)
 
 for _, mod in ipairs({
-  "telescope", "blink.cmp", "nvim-treesitter", "conform",
-  "mason", "lspconfig", "gitsigns", "lualine",
+  "telescope", "nvim-treesitter", "conform",
+  "gitsigns", "lualine",
 }) do
   check("require('" .. mod .. "')", (pcall(require, mod)))
 end
@@ -107,7 +107,9 @@ end
 print("# LSP / completion / formatting wiring")
 -- In 0.11+ vim.lsp.config is a callable *table*; vim.lsp.enable is a function.
 check("vim.lsp.config API present (nvim 0.11+)", vim.lsp.config ~= nil and type(vim.lsp.enable) == "function")
-check("mason-lspconfig loadable", (pcall(require, "mason-lspconfig")))
+-- Servers are configured through core (lua/config/lsp.lua), no mason/lspconfig.
+check("ruby_lsp configured via vim.lsp.config", vim.lsp.config.ruby_lsp ~= nil and vim.lsp.config.ruby_lsp.cmd ~= nil)
+check("built-in 'autocomplete' enabled (nvim 0.12)", vim.o.autocomplete == true)
 local conform_ok, conform = pcall(require, "conform")
 check("conform formatters_by_ft has lua/ruby/python",
   conform_ok and conform.formatters_by_ft

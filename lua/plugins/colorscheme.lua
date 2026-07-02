@@ -58,10 +58,8 @@ return {
           }
         end,
         integrations = {
-          blink_cmp = true,
           gitsigns = true,
           treesitter = true,
-          notify = false,
         },
       })
 

@@ -105,8 +105,8 @@ install_deps_linux() {
   $SUDO apt-get update -y
   # No nodejs/npm on purpose — this config is Node-free. Treesitter parsers are
   # built by the tree-sitter CLI (installed below) which invokes this C
-  # toolchain; jedi-language-server installs via Mason. JS/TS/HTML/CSS are
-  # formatted dependency-free via Treesitter (no biome/Node).
+  # toolchain. JS/TS/HTML/CSS are formatted dependency-free via Treesitter
+  # (no biome/Node). python3/pip back the black formatter.
   # xclip / wl-clipboard back the "+/"* registers (system clipboard) so
   # :checkhealth doesn't warn "No clipboard tool found". locales lets us
   # generate a UTF-8 locale below.
@@ -136,7 +136,7 @@ install_deps_macos() {
     eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
   fi
   info "Installing packages via Homebrew"
-  # Node-free: no node here. jedi-language-server comes from Mason inside Neovim.
+  # Node-free: no node here.
   # tree-sitter is the CLI that nvim-treesitter's `main` branch shells out to
   # when compiling parsers (`tree-sitter build`).
   # rbenv + ruby-build provide the Ruby toolchain (see install_ruby).
@@ -599,8 +599,8 @@ TMUXSTATS
 }
 
 # ----------------------------------------------------------------------------
-# Ruby (via rbenv)  —  required for ruby_lsp (LSP, installed by Mason) and
-# rubocop (formatter). rbenv keeps Ruby in $HOME, no system Ruby needed.
+# Ruby (via rbenv)  —  required for ruby-lsp (LSP) and rubocop (formatter),
+# both installed as gems below. rbenv keeps Ruby in $HOME, no system Ruby needed.
 # ----------------------------------------------------------------------------
 RBENV_ROOT="${RBENV_ROOT:-$HOME/.rbenv}"
 
@@ -692,7 +692,7 @@ install_ruby() {
 }
 
 # ----------------------------------------------------------------------------
-# stylua  (lua formatter — not handled by mason here)
+# stylua  (lua formatter — prebuilt release binary)
 # ----------------------------------------------------------------------------
 install_stylua() {
   command -v stylua >/dev/null 2>&1 && { ok "stylua present"; return; }
@@ -733,6 +733,19 @@ install_formatters() {
     gem install rubocop >/dev/null 2>&1 || warn "could not install rubocop; 'gem install rubocop' manually"
   elif ! command -v gem >/dev/null 2>&1; then
     warn "ruby/gem not found — skipping rubocop (install ruby, then 'gem install rubocop')"
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# LSP servers  (plain binaries on PATH — no Mason). lua/config/lsp.lua starts
+# them with the core vim.lsp.enable(); nothing downloads at editor runtime.
+# ----------------------------------------------------------------------------
+install_lsp_servers() {
+  if command -v gem >/dev/null 2>&1 && ! command -v ruby-lsp >/dev/null 2>&1; then
+    info "Installing ruby-lsp (ruby LSP)"
+    gem install ruby-lsp >/dev/null 2>&1 || warn "could not install ruby-lsp; 'gem install ruby-lsp' manually"
+  elif ! command -v gem >/dev/null 2>&1; then
+    warn "ruby/gem not found — skipping ruby-lsp (install ruby, then 'gem install ruby-lsp')"
   fi
 }
 
@@ -864,6 +877,7 @@ main() {
   install_tmux         # tmux + ~/.tmux.conf (only if absent)
   install_ruby         # rbenv + pinned Ruby (before formatters: rubocop needs gem)
   install_formatters
+  install_lsp_servers  # ruby-lsp (gem) — no Mason
   install_tree_sitter_cli
   install_font         # JetBrainsMono Nerd Font (icons)
   install_kitty        # kitty terminal (optional — prompts the user)

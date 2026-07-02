@@ -6,7 +6,7 @@ A lean, **Node-free** Lua config built on [lazy.nvim](https://github.com/folke/l
 
 Requires Neovim **0.12.0+** (nvim-treesitter's `main` branch and the `vim.lsp.config`/`vim.lsp.enable` API need it).
 
-> **No JavaScript runtime required.** This config never installs or runs Node/npm. JS/TS/HTML/CSS/JSON/ERB get Treesitter highlighting, indentation, and dependency-free format-on-save (Treesitter re-indent + whitespace normalization — see [`lua/config/tsformat.lua`](lua/config/tsformat.lua)). Ruby uses `ruby_lsp` (gem) and Python uses `jedi-language-server` (pip). Treesitter parsers are built by the [`tree-sitter` CLI](https://github.com/tree-sitter/tree-sitter) (a single Rust binary) invoking the system C compiler — required by nvim-treesitter's `main` branch.
+> **No JavaScript runtime required.** This config never installs or runs Node/npm. JS/TS/HTML/CSS/JSON/ERB get Treesitter highlighting, indentation, and dependency-free format-on-save (Treesitter re-indent + whitespace normalization — see [`lua/config/tsformat.lua`](lua/config/tsformat.lua)). Ruby uses `ruby_lsp` (gem); Python gets Treesitter highlighting + `black` formatting (no LSP). Treesitter parsers are built by the [`tree-sitter` CLI](https://github.com/tree-sitter/tree-sitter) (a single Rust binary) invoking the system C compiler — required by nvim-treesitter's `main` branch.
 
 ---
 
@@ -31,7 +31,7 @@ The one-command installer and the Docker image (both under [Quick start](#quick-
 | **ripgrep** (`rg`) | Telescope live-grep and `:grep`. |
 | **fd** (`fd` / `fdfind`) | Faster Telescope file finding. |
 | **System clipboard tool** | The `"+`/`"*` registers. `xclip` or `wl-clipboard` on Linux; built in on macOS (`pbcopy`); auto-wired on WSL (`clip.exe`). |
-| **python3 + pip** | Runtime for `jedi-language-server` (Python LSP) and the `black` formatter. |
+| **python3 + pip** | Runtime for the `black` formatter. |
 | **A [Nerd Font](#fonts)** | Icons in the statusline and pickers. Installed automatically (JetBrainsMono Nerd Font); set your terminal to use it. |
 
 ### Installed automatically by the installer — nothing to do
@@ -39,12 +39,12 @@ The one-command installer and the Docker image (both under [Quick start](#quick-
 - **Ruby** — via [rbenv](https://github.com/rbenv/rbenv): Ruby **3.4.9** (pinned, `rbenv global`), for `ruby_lsp` and `rubocop`. Override with `RUBY_VERSION=…`, or skip with `NO_RUBY=1`. (Manual route: `rbenv install 3.4.9 && rbenv global 3.4.9`.)
 - **Shell** — `zsh` + [oh-my-zsh](https://ohmyz.sh) + `zsh-autosuggestions` + `zsh-syntax-highlighting` + `fzf`, wired into `~/.zshrc` via a guarded block. Skip with `NO_SHELL=1`. (Setting zsh as your login shell is left to you: `chsh -s "$(command -v zsh)"`.)
 - **Plugins** — lazy.nvim on first launch, pinned to `lazy-lock.json`.
-- **LSP servers** — via [Mason](https://github.com/williamboman/mason.nvim): `ruby_lsp`, `jedi_language_server`. (No JS/TS LSP — biome was dropped because Mason installs it via npm; JS/TS get Treesitter only.)
+- **LSP server** — a plain binary on PATH, no Mason: `ruby-lsp` (gem). Started by Neovim's built-in `vim.lsp.enable()`. (No JS/TS/Python LSP — JS/TS/Python get Treesitter only.)
 - **Formatters** — `stylua`, best-effort `black` (pip) and `rubocop` (gem).
 
 ### Explicitly *not* required
 
-- **Node.js / npm** — this config is Node-free by design. JS/TS/HTML/CSS/JSON/ERB are formatted dependency-free via Treesitter (no biome/prettier/ts_ls); the Python LSP (jedi) is pure Python.
+- **Node.js / npm** — this config is Node-free by design. JS/TS/HTML/CSS/JSON/ERB are formatted dependency-free via Treesitter (no biome/prettier/ts_ls).
 
 ---
 
@@ -58,7 +58,7 @@ Installs Neovim (latest stable, 0.12+), the required tools, clones this repo to 
 curl -fsSL https://raw.githubusercontent.com/nywton/nvim-lazy/main/scripts/install.sh | bash
 ```
 
-Then just run `nvim` (LSP servers install on first use via `:Mason`).
+Then just run `nvim` (the LSP servers are already on PATH — nothing downloads at editor runtime).
 
 Already cloned? Update in place:
 
@@ -77,7 +77,7 @@ Already cloned? Update in place:
 - **tmux** — `tmux`, a dependency-free `~/.config/tmux/stats.sh` (CPU/GPU/RAM/DISK, refreshed every 5s), and a Catppuccin Mocha `~/.tmux.conf` (pure tmux, no TPM/plugins). The base config is written only if you don't already have one; the stats status bar is added/refreshed on **every** run via a guarded managed block, so re-running picks it up even on top of an existing config. Skip with `NO_TMUX=1`
 - **Font** — JetBrainsMono Nerd Font into `~/.local/share/fonts` (Linux) or via brew cask (macOS); skip with `NO_FONT=1`
 - **Formatters** — `stylua` (lua), best-effort `black` (python, pip) and `rubocop` (ruby, gem)
-- **LSP binaries** `jedi-language-server` (and `ruby-lsp`, given a Ruby) install automatically via Mason on first launch
+- **LSP binary** — `ruby-lsp` (gem, given a Ruby), installed directly on PATH (no Mason)
 
 Every step is **idempotent** — re-run any time to update; already-installed pieces are just checked/updated.
 
@@ -107,8 +107,8 @@ Plugin data and shell history are kept in named volumes, so nothing re-installs 
 
 ## What's inside
 
-- **LSP** via mason + nvim-lspconfig — `ruby_lsp` (gem), `jedi_language_server` (python) — both Node-free, auto-installed on first launch
-- **Completion**: [blink.cmp](https://github.com/saghen/blink.cmp) (LSP, path, snippets, buffer + cmdline) — ships a prebuilt Rust binary
+- **LSP** via Neovim core (`vim.lsp.config` + `vim.lsp.enable`, no mason/nvim-lspconfig) — `ruby_lsp` (gem), Node-free, installed by the install script
+- **Completion**: Neovim 0.12's built-in `'autocomplete'` (LSP + buffer words, popup as you type) — zero plugins
 - **Formatting on save**: [conform.nvim](https://github.com/stevearc/conform.nvim) — `stylua` (lua), `rubocop` (ruby), `black` (python). JS/TS/JSON/HTML/CSS/SCSS/ERB/Slim are formatted dependency-free via Treesitter re-indent ([`lua/config/tsformat.lua`](lua/config/tsformat.lua)) — indentation + whitespace only, no external tool
 - **Treesitter** highlighting (incl. js/ts/tsx/html/css/scss/erb/slim) + `nvim-ts-autotag`
 - **Fuzzy find**: telescope · **Git**: fugitive + gitsigns · **Nav**: harpoon

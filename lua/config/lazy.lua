@@ -30,9 +30,23 @@ require("lazy").setup({
   -- Configure any other settings here. See the documentation for more details.
   -- colorscheme that will be used when installing plugins.
   install = { colorscheme = { "habamax" } },
-  -- automatically check for plugin updates
-  checker = { enabled = true, notify = false },
+  -- No background update checker: it spawns periodic git processes and keeps
+  -- state resident. Update explicitly with :Lazy update instead.
+  checker = { enabled = false },
   -- No plugin in this config needs luarocks; disabling it stops lazy from
   -- bootstrapping hererocks and clears the :checkhealth luarocks ERROR.
   rocks = { enabled = false },
+  performance = {
+    rtp = {
+      -- Built-in plugins this config never uses (netrw stays — <leader>e).
+      disabled_plugins = {
+        "gzip",
+        "tarPlugin",
+        "zipPlugin",
+        "tohtml",
+        "tutor",
+        "rplugin",
+      },
+    },
+  },
 })
