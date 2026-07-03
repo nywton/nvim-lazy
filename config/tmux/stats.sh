@@ -86,7 +86,7 @@ cpu_pct() {
 
 cpu() {
   local p; p=$(cpu_pct)
-  printf '#[fg=%s]%s %-4s' "$(heat "$p")" "$I_CPU" "${p}%"
+  printf '#[fg=%s]%s %s%%' "$(heat "$p")" "$I_CPU" "$p"
 }
 
 # GPU % — omitted entirely (empty string) when no GPU is present.
@@ -100,7 +100,7 @@ gpu() {
       | head -1 | awk '{print $1}')
   fi
   [ -z "$v" ] && return
-  printf '#[fg=%s]%s %-4s' "$(heat "$v")" "$I_GPU" "${v}%"
+  printf '#[fg=%s]%s %s%%' "$(heat "$v")" "$I_GPU" "$v"
 }
 
 ram() {
