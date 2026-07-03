@@ -392,283 +392,67 @@ install_tmux() {
     fi
   fi
 
-  # --- ~/.config/tmux/stats.sh — the status-bar stats helper
-  # (cpu / gpu_seg / ram / disk / net / ip). Always (re)written so updates
-  # propagate; it's a generated helper, not user-editable config. No external deps.
+  # --- ~/.config/tmux/stats.sh — the status-bar stats helper (CPU/GPU/RAM/
+  # DISK/NET/Docker). Copied from the repo (config/tmux/stats.sh) so it's a
+  # single source of truth — edit it there, re-run the installer anywhere to
+  # pick up the change. Always (re)copied since it's a generated helper, not
+  # user-editable config.
   local stats="$HOME/.config/tmux/stats.sh"
-  info "Writing $stats"
-  mkdir -p "$(dirname "$stats")"
-  cat > "$stats" <<'STATSSH'
-#!/usr/bin/env bash
-# Lightweight system stats for the tmux status bar (macOS + Linux).
-# Usage: stats.sh <cpu|gpu_seg|ram|disk|net|ip>
-# No external dependencies / plugins — only built-in OS tools.
-
-os="$(uname -s)"
-
-cpu() {
-  if [ "$os" = "Darwin" ]; then
-    # 100 - idle%, from a single instantaneous top sample
-    top -l 1 -n 0 | awk '/CPU usage/ {
-      for (i = 1; i <= NF; i++)
-        if ($i == "idle") { gsub(/%/, "", $(i-1)); printf "%.1f%%", 100 - $(i-1) }
-    }'
+  if [ -f "$NVIM_DIR/config/tmux/stats.sh" ]; then
+    info "Writing $stats"
+    mkdir -p "$(dirname "$stats")"
+    cp "$NVIM_DIR/config/tmux/stats.sh" "$stats"
+    chmod +x "$stats"
+    ok "stats helper → $stats"
   else
-    # two /proc/stat samples ~0.2s apart → instantaneous busy %
-    read -r _ u1 n1 s1 i1 w1 q1 sq1 st1 _ < /proc/stat
-    sleep 0.2
-    read -r _ u2 n2 s2 i2 w2 q2 sq2 st2 _ < /proc/stat
-    local idle1=$((i1 + w1)) idle2=$((i2 + w2))
-    local tot1=$((u1 + n1 + s1 + i1 + w1 + q1 + sq1 + st1))
-    local tot2=$((u2 + n2 + s2 + i2 + w2 + q2 + sq2 + st2))
-    local dt=$((tot2 - tot1)) di=$((idle2 - idle1))
-    awk -v di="$di" -v dt="$dt" 'BEGIN { printf "%.1f%%", (dt > 0 ? (1 - di / dt) * 100 : 0) }'
+    warn "config/tmux/stats.sh not found in $NVIM_DIR; skipping stats helper deploy"
   fi
-}
-
-# Returns "GPU XX%  " (with trailing separator) when a GPU is detected, or
-# empty string when no GPU is present — callers omit the segment entirely.
-gpu_seg() {
-  local v=""
-  if [ "$os" = "Darwin" ]; then
-    v=$(ioreg -r -d 1 -w 0 -c AGXAccelerator 2>/dev/null \
-      | grep -o '"Device Utilization %"=[0-9]*' \
-      | head -1 \
-      | awk -F= '{ printf "%d%%", $2 }')
-  elif command -v nvidia-smi >/dev/null 2>&1; then
-    v=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null \
-      | head -1 | awk '{ printf "%d%%", $1 }')
-  fi
-  [ -n "$v" ] && printf 'GPU %s  ' "$v"
-}
-
-ram() {
-  if [ "$os" = "Darwin" ]; then
-    # used / total in GB (total from sysctl, used from top's PhysMem line)
-    local total used
-    total=$(sysctl -n hw.memsize | awk '{ printf "%.0f", $1 / 1073741824 }')
-    used=$(top -l 1 -n 0 | awk '/PhysMem/ {
-      v = $2
-      if (v ~ /G$/)      { sub(/G/, "", v); printf "%.1f", v }
-      else if (v ~ /M$/) { sub(/M/, "", v); printf "%.1f", v / 1024 }
-    }')
-    printf "%sGB/%sGB" "$used" "$total"
-  else
-    # used / total in GB from /proc/meminfo (values are in kB)
-    awk '/^MemTotal:/ { t = $2 } /^MemAvailable:/ { a = $2 }
-         END { printf "%.1fGB/%.0fGB", (t - a) / 1048576, t / 1048576 }' /proc/meminfo
-  fi
-}
-
-disk() {
-  # used / size of the volume that actually holds user data.
-  # macOS APFS mounts a read-only *system* volume at "/" (reports almost no
-  # usage); the real data lives on the Data volume. Linux just uses "/".
-  local mount="/"
-  [ "$os" = "Darwin" ] && mount="/System/Volumes/Data"
-  df -h "$mount" | awk 'NR==2 { gsub(/Gi/, "G", $2); gsub(/Gi/, "G", $3); printf "%s/%s", $3, $2 }'
-}
-
-# Network RX/TX rate for the primary non-loopback interface.
-# Outputs "↓X.XM ↑X.XM" using KB/s or MB/s units. Samples over ~1 second.
-# On VPS/servers this is the most actionable real-time metric.
-net() {
-  if [ "$os" = "Darwin" ]; then
-    local iface
-    iface=$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')
-    [ -z "$iface" ] && iface="en0"
-    local s1 s2
-    s1=$(netstat -ibn 2>/dev/null | awk -v i="$iface" '$1==i && /Link/ { print $7, $10; exit }')
-    sleep 1
-    s2=$(netstat -ibn 2>/dev/null | awk -v i="$iface" '$1==i && /Link/ { print $7, $10; exit }')
-    awk -v s1="$s1" -v s2="$s2" 'BEGIN {
-      split(s1, a, " "); split(s2, b, " ")
-      rx = b[1]-a[1]; tx = b[2]-a[2]
-      if (rx >= 1048576) printf "↓%.1fM", rx/1048576; else printf "↓%.0fK", rx/1024
-      if (tx >= 1048576) printf " ↑%.1fM", tx/1048576; else printf " ↑%.0fK", tx/1024
-    }'
-  else
-    # Find primary non-loopback interface via the default route.
-    local iface
-    iface=$(ip route 2>/dev/null | awk '/^default/ { print $5; exit }')
-    [ -z "$iface" ] && iface=$(awk 'NR>2 { gsub(/:/, "", $1); if ($1 != "lo") { print $1; exit } }' /proc/net/dev)
-    [ -z "$iface" ] && { printf "n/a"; return; }
-    local r1 t1 r2 t2
-    r1=$(awk -v i="${iface}:" '$1==i { print $2 }' /proc/net/dev)
-    t1=$(awk -v i="${iface}:" '$1==i { print $10 }' /proc/net/dev)
-    sleep 1
-    r2=$(awk -v i="${iface}:" '$1==i { print $2 }' /proc/net/dev)
-    t2=$(awk -v i="${iface}:" '$1==i { print $10 }' /proc/net/dev)
-    awk -v r1="$r1" -v t1="$t1" -v r2="$r2" -v t2="$t2" 'BEGIN {
-      rx = r2-r1; tx = t2-t1
-      if (rx >= 1048576) printf "↓%.1fM", rx/1048576; else printf "↓%.0fK", rx/1024
-      if (tx >= 1048576) printf " ↑%.1fM", tx/1048576; else printf " ↑%.0fK", tx/1024
-    }'
-  fi
-}
-
-# Primary LAN IPv4. Named ipaddr() so it never shadows the `ip` command.
-ipaddr() {
-  local a=""
-  if [ "$os" = "Darwin" ]; then
-    a="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)"
-  else
-    # hostname -I lists all addresses (first is the primary); fall back to the
-    # route-based lookup if it's empty (e.g. hostname without the -I flag).
-    a="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
-    [ -n "$a" ] || a="$(ip route get 1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i+1); exit } }')"
-  fi
-  printf '%s' "${a:-—}"
-}
-
-case "$1" in
-  cpu)     cpu     ;;
-  gpu_seg) gpu_seg ;;
-  ram)     ram     ;;
-  disk)    disk    ;;
-  net)     net     ;;
-  ip)      ipaddr  ;;
-esac
-STATSSH
-  chmod +x "$stats"
-  ok "stats helper → $stats"
 
   # --- ~/.tmux.conf ---
-  # Base config: written ONLY when absent (an existing config is never
-  # clobbered). The stats status bar is applied separately as a guarded
-  # managed block (below) so it's added/refreshed on EVERY run — even on top
-  # of a pre-existing or hand-edited config. tmux's `set -g` is last-wins, so
-  # the appended block overrides any earlier status-right.
+  # Base config: copied from the repo (config/tmux/tmux.conf) ONLY when
+  # absent — an existing config is never clobbered. The status bar is applied
+  # separately as a guarded managed block (below) so it's added/refreshed on
+  # EVERY run — even on top of a pre-existing or hand-edited config. tmux's
+  # `set -g` is last-wins, so the appended block overrides any earlier
+  # status-right.
   local rc="$HOME/.tmux.conf"
   if [ -e "$rc" ]; then
     ok ".tmux.conf already exists → leaving the base config untouched"
-  else
+  elif [ -f "$NVIM_DIR/config/tmux/tmux.conf" ]; then
     info "Writing $rc"
-    cat > "$rc" <<'TMUXCONF'
-# =============================================================================
-# General
-# =============================================================================
-
-set -g default-terminal "tmux-256color"
-set -ag terminal-overrides ",xterm-256color:RGB"
-
-set -g prefix C-a
-unbind C-b
-bind C-a send-prefix
-
-set -g base-index 1
-setw -g pane-base-index 1
-set -g renumber-windows on
-
-set -g mouse on
-set -g escape-time 0
-set -g history-limit 10000
-set -g focus-events on
-
-# vi mode
-set-window-option -g mode-keys vi
-# Use v to begin selection like Vim's visual mode
-bind-key -T copy-mode-vi v send-keys -X begin-selection
-# Use y to yank selection like Vim's yank
-bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
-
-
-# =============================================================================
-# Keybinds
-# =============================================================================
-
-bind r source-file ~/.tmux.conf \; display "Config reloaded"
-
-bind | split-window -h -c "#{pane_current_path}"
-bind - split-window -v -c "#{pane_current_path}"
-unbind '"'
-unbind %
-
-bind h select-pane -L
-bind j select-pane -D
-bind k select-pane -U
-bind l select-pane -R
-
-# =============================================================================
-# Catppuccin Mocha — matching kitty config
-# =============================================================================
-
-# Palette
-# base     #1E1E2E
-# mantle   #11111B (tab_bar_background in kitty)
-# surface0 #313244
-# overlay0 #6C7086
-# text     #CDD6F4
-# peach    #fab387 (active tab color in kitty)
-# lavender #B4BEFE
-# mauve    #CBA6F7
-
-# Status bar
-set -g status on
-set -g status-position bottom
-set -g status-interval 5
-# "default" bg lets kitty's background_opacity bleed through
-set -g status-style "bg=default,fg=#6C7086"
-
-# Left: session name
-set -g status-left " #[fg=#CBA6F7,bg=default]#{session_name}#[fg=#6C7086]  "
-set -g status-left-length 30
-
-# Windows — bg=default keeps transparency
-set -g window-status-style         "bg=default"
-set -g window-status-current-style "bg=default"
-set -g window-status-format         "#[fg=#6C7086,bg=default] #{window_index}:#{window_name} "
-set -g window-status-current-format "#[fg=#fab387,bg=default] #{window_index}:#{window_name} "
-set -g window-status-separator ""
-
-# Pane borders
-set -g pane-border-style        "fg=#313244"
-set -g pane-active-border-style "fg=#B4BEFE"
-
-# Command / message line
-set -g message-style "bg=#313244,fg=#CDD6F4"
-
-# NB: the status bar's right side (system stats + IP + clock) is appended as a
-# guarded managed block by the installer — keep it there so re-runs can refresh
-# it. See the "# >>> nvim-lazy tmux stats >>>" block at the bottom of this file.
-TMUXCONF
+    cp "$NVIM_DIR/config/tmux/tmux.conf" "$rc"
     ok "configured .tmux.conf"
+  else
+    warn "config/tmux/tmux.conf not found in $NVIM_DIR; skipping base config deploy"
   fi
 
-  # --- stats status bar (guarded managed block — added/refreshed every run) ---
-  # Idempotent: strip any previous block, then append the current one. tmux
-  # applies `set -g` last-wins, so this overrides whatever status-right the rest
-  # of the file (yours or ours) set. Remove the whole block to undo.
-  info "Applying tmux stats status bar (managed block)"
-  local tmp; tmp="$(mktemp)"
-  # Strip any previous managed block, then drop trailing blank lines so the
-  # single blank separator we re-add below can't accumulate across re-runs.
-  awk '
-    /^# >>> nvim-lazy tmux stats >>>/ { skip = 1 }
-    !skip { lines[++n] = $0 }
-    /^# <<< nvim-lazy tmux stats <<</ { skip = 0 }
-    END {
-      while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
-      for (i = 1; i <= n; i++) print lines[i]
-    }
-  ' "$rc" > "$tmp"
-  cat >> "$tmp" <<'TMUXSTATS'
-
-# >>> nvim-lazy tmux stats >>>  (managed block — remove the whole block to undo)
-# OSC 52 clipboard passthrough: lets nvim (and copy-mode y) reach the LOCAL
-# machine's clipboard through SSH — required on headless servers where there
-# is no X/Wayland clipboard tool. Your terminal must support OSC 52 (kitty,
-# iTerm2, WezTerm, Ghostty, Windows Terminal all do).
-set -s set-clipboard on
-set -g status-interval 5
-set -g status-right-length 180
-# system stats via ~/.config/tmux/stats.sh:
-#   cpu / gpu_seg (hidden when no GPU) / ram / disk / net (↓RX ↑TX) / ip + clock
-set -g status-right "#[fg=#fab387]CPU #[fg=#CDD6F4]#(~/.config/tmux/stats.sh cpu)  #[fg=#CBA6F7]#(~/.config/tmux/stats.sh gpu_seg)#[fg=#A6E3A1]RAM #[fg=#CDD6F4]#(~/.config/tmux/stats.sh ram)  #[fg=#89B4FA]DISK #[fg=#CDD6F4]#(~/.config/tmux/stats.sh disk)  #[fg=#74C7EC]NET #[fg=#CDD6F4]#(~/.config/tmux/stats.sh net)  #[fg=#F9E2AF]#(whoami)@#H #[fg=#94E2D5]#(~/.config/tmux/stats.sh ip)  #[fg=#6C7086]%H:%M  %d %b "
-# <<< nvim-lazy tmux stats <<<
-TMUXSTATS
-  mv "$tmp" "$rc"
-  ok "stats status bar applied → $rc"
+  # --- status bar (guarded managed block — added/refreshed every run) ---
+  # Idempotent: strip any previous block, then append the current one (from
+  # config/tmux/statusbar.conf). tmux applies `set -g` last-wins, so this
+  # overrides whatever status-right the rest of the file (yours or ours) set.
+  # Remove the whole block to undo.
+  if [ -f "$NVIM_DIR/config/tmux/statusbar.conf" ] && [ -e "$rc" ]; then
+    info "Applying tmux status bar (managed block)"
+    local tmp; tmp="$(mktemp)"
+    # Strip any previous managed block, then drop trailing blank lines so the
+    # single blank separator we re-add below can't accumulate across re-runs.
+    awk '
+      /^# >>> nvim-lazy tmux stats >>>/ { skip = 1 }
+      !skip { lines[++n] = $0 }
+      /^# <<< nvim-lazy tmux stats <<</ { skip = 0 }
+      END {
+        while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
+        for (i = 1; i <= n; i++) print lines[i]
+      }
+    ' "$rc" > "$tmp"
+    {
+      printf '\n# >>> nvim-lazy tmux stats >>>  (managed block — remove the whole block to undo)\n'
+      cat "$NVIM_DIR/config/tmux/statusbar.conf"
+      printf '# <<< nvim-lazy tmux stats <<<\n'
+    } >> "$tmp"
+    mv "$tmp" "$rc"
+    ok "status bar applied → $rc"
+  fi
 
   # Live-reload if we're running inside a tmux session.
   if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
@@ -794,6 +578,40 @@ install_stylua() {
 }
 
 # ----------------------------------------------------------------------------
+# Install a gem under EVERY installed rbenv Ruby, not just whichever version
+# happens to be active/global right now. `command -v <gem's bin>` is a false
+# positive under rbenv: it finds the shim as soon as ONE version has the gem,
+# even if the currently active (or a project-pinned .ruby-version) version
+# doesn't — that's what let ruby-lsp silently go missing for a second Ruby
+# version here. Actually invoking the shim (`--version`) is what rbenv itself
+# uses to resolve "is this installed for the active version", so that's the
+# check we mirror per-version below.
+# ----------------------------------------------------------------------------
+install_gem_everywhere() {
+  local gem_name="$1" bin_name="$2" label="$3"
+  if ! command -v rbenv >/dev/null 2>&1; then
+    if command -v gem >/dev/null 2>&1 && ! command -v "$bin_name" >/dev/null 2>&1; then
+      info "Installing $label"
+      gem install "$gem_name" >/dev/null 2>&1 || warn "could not install $gem_name; 'gem install $gem_name' manually"
+    elif ! command -v gem >/dev/null 2>&1; then
+      warn "ruby/gem not found — skipping $label (install ruby, then 'gem install $gem_name')"
+    fi
+    return
+  fi
+
+  local v
+  for v in $(rbenv versions --bare 2>/dev/null); do
+    if RBENV_VERSION="$v" rbenv exec "$bin_name" --version >/dev/null 2>&1; then
+      continue
+    fi
+    info "Installing $label for Ruby $v"
+    RBENV_VERSION="$v" rbenv exec gem install "$gem_name" >/dev/null 2>&1 \
+      || warn "could not install $gem_name for Ruby $v; 'RBENV_VERSION=$v gem install $gem_name' manually"
+  done
+  rbenv rehash 2>/dev/null || true
+}
+
+# ----------------------------------------------------------------------------
 # language formatters used by conform.nvim  (best-effort)
 # ----------------------------------------------------------------------------
 install_formatters() {
@@ -806,12 +624,7 @@ install_formatters() {
       || warn "could not install black; 'pip3 install black' manually"
   fi
 
-  if command -v gem >/dev/null 2>&1 && ! command -v rubocop >/dev/null 2>&1; then
-    info "Installing rubocop (ruby formatter)"
-    gem install rubocop >/dev/null 2>&1 || warn "could not install rubocop; 'gem install rubocop' manually"
-  elif ! command -v gem >/dev/null 2>&1; then
-    warn "ruby/gem not found — skipping rubocop (install ruby, then 'gem install rubocop')"
-  fi
+  install_gem_everywhere rubocop rubocop "rubocop (ruby formatter)"
 }
 
 # ----------------------------------------------------------------------------
@@ -819,12 +632,7 @@ install_formatters() {
 # them with the core vim.lsp.enable(); nothing downloads at editor runtime.
 # ----------------------------------------------------------------------------
 install_lsp_servers() {
-  if command -v gem >/dev/null 2>&1 && ! command -v ruby-lsp >/dev/null 2>&1; then
-    info "Installing ruby-lsp (ruby LSP)"
-    gem install ruby-lsp >/dev/null 2>&1 || warn "could not install ruby-lsp; 'gem install ruby-lsp' manually"
-  elif ! command -v gem >/dev/null 2>&1; then
-    warn "ruby/gem not found — skipping ruby-lsp (install ruby, then 'gem install ruby-lsp')"
-  fi
+  install_gem_everywhere ruby-lsp ruby-lsp "ruby-lsp (ruby LSP)"
 }
 
 # ----------------------------------------------------------------------------
@@ -952,6 +760,8 @@ main() {
     Darwin) install_deps_macos ;;
     *) die "Unsupported OS: $OS (Linux/macOS only)" ;;
   esac
+  setup_config         # clone/update the repo first: install_tmux and
+                        # install_kitty below copy files out of it
   install_shell        # zsh + oh-my-zsh + plugins (idempotent)
   install_tmux         # tmux + ~/.tmux.conf (only if absent)
   install_ruby         # rbenv + pinned Ruby (before formatters: rubocop needs gem)
@@ -960,7 +770,6 @@ main() {
   install_tree_sitter_cli
   install_font         # JetBrainsMono Nerd Font (icons)
   install_kitty        # kitty terminal (optional — prompts the user)
-  setup_config
   sync_plugins
   printf '\n%s\n' "${GREEN}${BOLD}Done.${RESET} Launch with: ${BOLD}nvim${RESET}"
 }

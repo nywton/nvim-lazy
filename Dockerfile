@@ -95,6 +95,12 @@ COPY --chown=${USER}:${USER} docker/tmux.conf /home/${USER}/.tmux.conf
 
 # --- the Neovim config + headless plugin install ---------------------------
 COPY --chown=${USER}:${USER} . /home/${USER}/.config/nvim
+# tmux status-bar stats helper (CPU/RAM/DISK/NET/Docker) — docker/tmux.conf
+# above shells out to this; single source of truth is config/tmux/stats.sh,
+# the same file the host installer (scripts/install.sh) deploys.
+RUN mkdir -p /home/${USER}/.config/tmux \
+    && cp /home/${USER}/.config/nvim/config/tmux/stats.sh /home/${USER}/.config/tmux/stats.sh \
+    && chmod +x /home/${USER}/.config/tmux/stats.sh
 # nvim-treesitter `main` branch: no :TSUpdateSync, and :TSUpdate is async, so
 # install the configured parsers synchronously via the Lua API. The parser list
 # comes from lua/config/treesitter_parsers.lua (shared with the plugin config).
