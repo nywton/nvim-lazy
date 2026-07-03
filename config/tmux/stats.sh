@@ -185,9 +185,10 @@ ip() {
 
 # Docker summary — hidden entirely when docker isn't installed, the daemon
 # isn't reachable, or nothing is running (all three just mean "nothing to
-# summarize"). containers  cpu%  mem-used/limit  disk  io (lifetime, since
-# each container started — `docker stats --no-stream` has no rate for this,
-# and a second sample to derive one would double an already-~2s call).
+# summarize"). containers  cpu%  mem-used/limit  disk, each metric after the
+# container count identified by the same icon its system-wide counterpart
+# uses (I_CPU/I_RAM/I_DISK), so the group reads the same way as the rest of
+# the navbar.
 docker_seg() {
   command -v docker >/dev/null 2>&1 || return 0
 
@@ -198,7 +199,7 @@ docker_seg() {
   local df_pid=$!
 
   local raw
-  raw=$(timeout 2 docker stats --no-stream --format '{{.CPUPerc}}|{{.MemUsage}}|{{.BlockIO}}' 2>/dev/null)
+  raw=$(timeout 2 docker stats --no-stream --format '{{.CPUPerc}}|{{.MemUsage}}' 2>/dev/null)
   if [ -z "$raw" ]; then
     wait "$df_pid" 2>/dev/null
     rm -rf "$tmp"
@@ -223,32 +224,20 @@ docker_seg() {
     END { printf "%.0f %.0f", su, sl }
   ')"
 
-  local io_r io_w
-  read -r io_r io_w <<<"$(printf '%s\n' "$raw" | awk -F'|' '
-    function toMB(v) { return (v ~ /GB/) ? (v + 0) * 1024 : (v + 0) }
-    { split($3, a, " / "); sr += toMB(a[1]); st += toMB(a[2]) }
-    END { printf "%.0f %.0f", sr, st }
-  ')"
-
   local mem_pct; mem_pct=$(awk -v u="$mem_used" -v l="$mem_limit" 'BEGIN { printf "%.0f", (l > 0) ? u / l * 100 : 0 }')
   local disk_c; disk_c=$(heat_abs "${disk_mb:-0}" 5120 20480)
   local disk_fmt; disk_fmt=$(awk -v m="$disk_mb" 'BEGIN { if (m >= 1024) printf "%.1fG", m / 1024; else printf "%dM", m }')
-  local io_c; io_c=$(heat_abs "$(awk -v r="$io_r" -v w="$io_w" 'BEGIN { print (r > w ? r : w) }')" 200 1000)
 
   # mem_limit is the container memory cap and barely changes -- pad used to
-  # its width. io_r/io_w have no stable anchor, so just pad each to the
-  # wider of the two (same trick as net()'s rx/tx).
+  # its width (same trick as ram()'s used/total).
   local mu="${mem_used}M" ml="${mem_limit}M" mw=${#ml}
   (( ${#mu} > mw )) && mw=${#mu}
-  local ir="${io_r}M" iw="${io_w}M" iow=${#ir}
-  (( ${#iw} > iow )) && iow=${#iw}
 
-  printf '#[fg=%s]%s %-3s  #[fg=%s]%-4s  #[fg=%s]%-*s/%s  #[fg=%s]%-6s  #[fg=%s]%-*s %s' \
+  printf '#[fg=%s]%s %-3s  #[fg=%s]%s %-4s  #[fg=%s]%s %-*s/%s  #[fg=%s]%s %s' \
     "$C_DOCKER" "$I_DOCKER" "$n" \
-    "$(heat "$cpu_sum")" "${cpu_sum}%" \
-    "$(heat "$mem_pct")" "$mw" "$mu" "$ml" \
-    "$disk_c" "$disk_fmt" \
-    "$io_c" "$iow" "$ir" "$iw"
+    "$(heat "$cpu_sum")" "$I_CPU" "${cpu_sum}%" \
+    "$(heat "$mem_pct")" "$I_RAM" "$mw" "$mu" "$ml" \
+    "$disk_c" "$I_DISK" "$disk_fmt"
 }
 
 # Runs every stat concurrently (docker + net each block ~1s on their own) and
