@@ -31,7 +31,7 @@ C_IP="#94E2D5"; C_DOCKER="#89DCEB"
 # above.
 I_CPU="󰻠"
 I_GPU="󰢮"
-I_RAM=""
+I_RAM=""
 I_DISK="󰋊"
 I_IP="󰩠"
 I_DOCKER="󰡨"
@@ -74,10 +74,24 @@ cpu_pct() {
         if ($i == "idle") { gsub(/%/, "", $(i-1)); printf "%.0f", 100 - $(i-1) }
     }'
   else
-    # two /proc/stat samples ~0.2s apart -> instantaneous busy %
-    read -r _ u1 n1 s1 i1 w1 q1 sq1 st1 _ < /proc/stat
-    sleep 0.2
+    # Diff against the previous call's /proc/stat sample (cached to a tmpfile)
+    # instead of sampling twice ~0.2s apart in-process. That short a window
+    # made this script's own fork/exec churn (awk, docker stats, etc. all
+    # launched every refresh) a sizeable fraction of the ticks being
+    # measured, so the navbar read noticeably higher than htop. Diffing
+    # across the real ~5s status-interval instead dilutes that overhead to
+    # noise and matches what htop shows over the same wall-clock span.
+    local cache="/tmp/.tmux_stats_cpu_$(id -u)"
+    local u2 n2 s2 i2 w2 q2 sq2 st2
     read -r _ u2 n2 s2 i2 w2 q2 sq2 st2 _ < /proc/stat
+
+    local prev=""
+    [ -r "$cache" ] && prev=$(<"$cache")
+    printf '%s %s %s %s %s %s %s %s' "$u2" "$n2" "$s2" "$i2" "$w2" "$q2" "$sq2" "$st2" > "$cache"
+    [ -z "$prev" ] && { printf '0'; return; }
+
+    local u1 n1 s1 i1 w1 q1 sq1 st1
+    read -r u1 n1 s1 i1 w1 q1 sq1 st1 <<<"$prev"
     local idle1=$((i1 + w1)) idle2=$((i2 + w2))
     local tot1=$((u1 + n1 + s1 + i1 + w1 + q1 + sq1 + st1))
     local tot2=$((u2 + n2 + s2 + i2 + w2 + q2 + sq2 + st2))
