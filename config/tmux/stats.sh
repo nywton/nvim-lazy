@@ -2,10 +2,16 @@
 # System stats for the tmux top navbar (macOS + Linux). No external deps.
 # Usage: stats.sh <navbar|cpu|ram|disk|net|ip|gpu|docker>
 #
-# Every value is a short plain-ASCII label (no Nerd Font glyphs -- those only
-# render if the LOCAL terminal has one installed, which broke silently as
-# blank boxes) colored "thermometer" style -- green/yellow/red by how hard
-# the resource is being worked, see heat()/heat_rate()/heat_abs().
+# Every value is prefixed with a Nerd Font icon, colored "thermometer" style
+# -- green/yellow/red by how hard the resource is being worked, see
+# heat()/heat_rate()/heat_abs().
+#
+# These icons are rendered by whichever terminal emulator is DISPLAYING the
+# tmux session, not by the host this script runs on -- installing the font
+# here does nothing for rendering. Every local machine/terminal app you SSH
+# from needs a Nerd Font (e.g. JetBrainsMono Nerd Font, see
+# scripts/install.sh's install_font()) installed and selected as its font,
+# or these show up as blank boxes.
 #
 # To add a new stat: write a function that prints "#[fg=<hex>]<label> <value>"
 # (or nothing, to hide the segment), then add it to the `jobs` list in
@@ -18,14 +24,15 @@ os="$(uname -s)"
 C_GREEN="#A6E3A1"; C_YELLOW="#F9E2AF"; C_RED="#F38BA8"
 C_IP="#94E2D5"; C_DOCKER="#89DCEB"
 
-# Plain ASCII labels -- render identically in every terminal/font, no Nerd
-# Font dependency.
-I_CPU="C"
-I_GPU="G"
-I_RAM="M"
-I_DISK="D"
-I_IP="IP"
-I_DOCKER="DK"
+# Nerd Font icons, all Material Design Icons (md-cpu_64_bit,
+# md-expansion_card, md-memory, md-harddisk, md-ip_network, md-docker) --
+# requires a Nerd Font in the viewing terminal, see the note above.
+I_CPU="󰻠"
+I_GPU="󰢮"
+I_RAM="󰍛"
+I_DISK="󰋊"
+I_IP="󰩠"
+I_DOCKER="󰡨"
 
 # pct (0-100, no "%") -> hex color
 heat() {
@@ -79,7 +86,7 @@ cpu_pct() {
 
 cpu() {
   local p; p=$(cpu_pct)
-  printf '#[fg=%s]%s %s%%' "$(heat "$p")" "$I_CPU" "$p"
+  printf '#[fg=%s]%s %-4s' "$(heat "$p")" "$I_CPU" "${p}%"
 }
 
 # GPU % — omitted entirely (empty string) when no GPU is present.
@@ -93,7 +100,7 @@ gpu() {
       | head -1 | awk '{print $1}')
   fi
   [ -z "$v" ] && return
-  printf '#[fg=%s]%s %s%%' "$(heat "$v")" "$I_GPU" "$v"
+  printf '#[fg=%s]%s %-4s' "$(heat "$v")" "$I_GPU" "${v}%"
 }
 
 ram() {
@@ -110,7 +117,12 @@ ram() {
       END { printf "%.1f %.1f", (t - a) / 1048576, t / 1048576 }' /proc/meminfo)
   fi
   pct=$(awk -v u="$used" -v t="$total" 'BEGIN { printf "%.0f", (t > 0) ? u / t * 100 : 0 }')
-  printf '#[fg=%s]%s %sG/%sG' "$(heat "$pct")" "$I_RAM" "$used" "$total"
+  # total barely changes -- pad used to its width (not a worst-case guess)
+  # so the "/" doesn't drift as used gains/loses a digit.
+  local u="${used}G" t="${total}G" w=${#total}
+  (( ${#used} > w )) && w=${#used}
+  ((w += 1))
+  printf '#[fg=%s]%s %-*s/%s' "$(heat "$pct")" "$I_RAM" "$w" "$u" "$t"
 }
 
 disk() {
@@ -120,7 +132,11 @@ disk() {
   used=$(printf '%s' "$line" | awk '{ gsub(/Gi/, "G", $3); print $3 }')
   total=$(printf '%s' "$line" | awk '{ gsub(/Gi/, "G", $2); print $2 }')
   pct=$(printf '%s' "$line" | awk '{ gsub(/%/, "", $5); print $5 }')
-  printf '#[fg=%s]%s %s/%s' "$(heat "$pct")" "$I_DISK" "$used" "$total"
+  # total (filesystem size) is fixed -- pad used to its width instead of a
+  # worst-case guess, so the "/" doesn't drift as used gains/loses a digit.
+  local w=${#total}
+  (( ${#used} > w )) && w=${#used}
+  printf '#[fg=%s]%s %-*s/%s' "$(heat "$pct")" "$I_DISK" "$w" "$used" "$total"
 }
 
 # Network RX/TX rate for the primary non-loopback interface. Samples ~1s.
@@ -144,10 +160,16 @@ net() {
     'BEGIN { print r2 - r1, t2 - t1 }')"
   local kb; kb=$(awk -v r="$rx" -v t="$tx" 'BEGIN { printf "%.0f", (r > t ? r : t) / 1024 }')
   printf '#[fg=%s]' "$(heat_rate "$kb")"
-  awk -v rx="$rx" -v tx="$tx" 'BEGIN {
-    if (rx >= 1048576) printf "%.1fM ", rx / 1048576; else printf "%.0fK ", rx / 1024
-    if (tx >= 1048576) printf "%.1fM", tx / 1048576; else printf "%.0fK", tx / 1024
-  }'
+  # rx/tx have no stable anchor to pad against (unlike ram/disk's total) --
+  # pad each to the wider of the two so at least this pair doesn't drift.
+  awk -v rx="$rx" -v tx="$tx" '
+    function fmt(v) { return (v >= 1048576) ? sprintf("%.1fM", v / 1048576) : sprintf("%.0fK", v / 1024) }
+    BEGIN {
+      r = fmt(rx); t = fmt(tx)
+      w = (length(r) > length(t)) ? length(r) : length(t)
+      printf "↓%-*s ↑%s", w, r, t
+    }
+  '
 }
 
 ip() {
@@ -213,12 +235,20 @@ docker_seg() {
   local disk_fmt; disk_fmt=$(awk -v m="$disk_mb" 'BEGIN { if (m >= 1024) printf "%.1fG", m / 1024; else printf "%dM", m }')
   local io_c; io_c=$(heat_abs "$(awk -v r="$io_r" -v w="$io_w" 'BEGIN { print (r > w ? r : w) }')" 200 1000)
 
-  printf '#[fg=%s]%s %s  #[fg=%s]%s%%  #[fg=%s]%sM/%sM  #[fg=%s]%s  #[fg=%s]%sM %sM' \
+  # mem_limit is the container memory cap and barely changes -- pad used to
+  # its width. io_r/io_w have no stable anchor, so just pad each to the
+  # wider of the two (same trick as net()'s rx/tx).
+  local mu="${mem_used}M" ml="${mem_limit}M" mw=${#ml}
+  (( ${#mu} > mw )) && mw=${#mu}
+  local ir="${io_r}M" iw="${io_w}M" iow=${#ir}
+  (( ${#iw} > iow )) && iow=${#iw}
+
+  printf '#[fg=%s]%s %-3s  #[fg=%s]%-4s  #[fg=%s]%-*s/%s  #[fg=%s]%-6s  #[fg=%s]%-*s %s' \
     "$C_DOCKER" "$I_DOCKER" "$n" \
-    "$(heat "$cpu_sum")" "$cpu_sum" \
-    "$(heat "$mem_pct")" "$mem_used" "$mem_limit" \
+    "$(heat "$cpu_sum")" "${cpu_sum}%" \
+    "$(heat "$mem_pct")" "$mw" "$mu" "$ml" \
     "$disk_c" "$disk_fmt" \
-    "$io_c" "$io_r" "$io_w"
+    "$io_c" "$iow" "$ir" "$iw"
 }
 
 # Runs every stat concurrently (docker + net each block ~1s on their own) and
@@ -237,7 +267,14 @@ navbar() {
   for f in "$tmp"/*; do
     local v; v=$(<"$f")
     [ -z "$v" ] && continue
-    [ "$first" -eq 0 ] && printf '  '
+    if [ "$first" -eq 0 ]; then
+      # a heavier divider between the "system" group (cpu/gpu/ram/disk/net)
+      # and the "docker" group, a plain "  " gap between stats within a group
+      case "$f" in
+        */6_docker) printf ' #[fg=#6C7086]│#[fg=default] ' ;;
+        *)          printf '  ' ;;
+      esac
+    fi
     printf '%s' "$v"
     first=0
   done
