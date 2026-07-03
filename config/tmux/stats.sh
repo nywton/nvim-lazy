@@ -233,7 +233,7 @@ docker_seg() {
   local mu="${mem_used}M" ml="${mem_limit}M" mw=${#ml}
   (( ${#mu} > mw )) && mw=${#mu}
 
-  printf '#[fg=%s]%s %-3s  #[fg=%s]%s %-4s  #[fg=%s]%s %-*s/%s  #[fg=%s]%s %s' \
+  printf '#[fg=%s]%s %-3s #[fg=%s]%s %-4s #[fg=%s]%s %-*s/%s #[fg=%s]%s %s' \
     "$C_DOCKER" "$I_DOCKER" "$n" \
     "$(heat "$cpu_sum")" "$I_CPU" "${cpu_sum}%" \
     "$(heat "$mem_pct")" "$I_RAM" "$mw" "$mu" "$ml" \
