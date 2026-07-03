@@ -24,12 +24,14 @@ os="$(uname -s)"
 C_GREEN="#A6E3A1"; C_YELLOW="#F9E2AF"; C_RED="#F38BA8"
 C_IP="#94E2D5"; C_DOCKER="#89DCEB"
 
-# Nerd Font icons, all Material Design Icons (md-cpu_64_bit,
-# md-expansion_card, md-memory, md-harddisk, md-ip_network, md-docker) --
-# requires a Nerd Font in the viewing terminal, see the note above.
+# Nerd Font icons -- md-cpu_64_bit, md-expansion_card, fa-database (md-memory
+# reads as near-identical to md-cpu_64_bit at terminal size, so RAM uses
+# Font Awesome's database glyph instead), md-harddisk, md-ip_network,
+# md-docker -- requires a Nerd Font in the viewing terminal, see the note
+# above.
 I_CPU="󰻠"
 I_GPU="󰢮"
-I_RAM="󰍛"
+I_RAM=""
 I_DISK="󰋊"
 I_IP="󰩠"
 I_DOCKER="󰡨"
@@ -161,13 +163,12 @@ net() {
   local kb; kb=$(awk -v r="$rx" -v t="$tx" 'BEGIN { printf "%.0f", (r > t ? r : t) / 1024 }')
   printf '#[fg=%s]' "$(heat_rate "$kb")"
   # rx/tx have no stable anchor to pad against (unlike ram/disk's total) --
-  # pad each to the wider of the two so at least this pair doesn't drift.
+  # reserve a fixed 3-digit-wide number so the segment doesn't grow/shrink
+  # as throughput crosses the K/M boundary or gains/loses a digit.
   awk -v rx="$rx" -v tx="$tx" '
-    function fmt(v) { return (v >= 1048576) ? sprintf("%.1fM", v / 1048576) : sprintf("%.0fK", v / 1024) }
+    function fmt(v) { return (v >= 1048576) ? sprintf("%3.0fM", v / 1048576) : sprintf("%3.0fK", v / 1024) }
     BEGIN {
-      r = fmt(rx); t = fmt(tx)
-      w = (length(r) > length(t)) ? length(r) : length(t)
-      printf "↓%-*s ↑%s", w, r, t
+      printf "↓%s ↑%s", fmt(rx), fmt(tx)
     }
   '
 }
@@ -243,7 +244,6 @@ navbar() {
   gpu        > "$tmp/2_gpu"    &
   ram        > "$tmp/3_ram"    &
   disk       > "$tmp/4_disk"   &
-  net        > "$tmp/5_net"    &
   docker_seg > "$tmp/6_docker" &
   wait
 
@@ -252,8 +252,8 @@ navbar() {
     local v; v=$(<"$f")
     [ -z "$v" ] && continue
     if [ "$first" -eq 0 ]; then
-      # a heavier divider between the "system" group (cpu/gpu/ram/disk/net)
-      # and the "docker" group, a plain "  " gap between stats within a group
+      # a heavier divider between the "system" group (cpu/gpu/ram/disk) and
+      # the "docker" group, a plain "  " gap between stats within a group
       case "$f" in
         */6_docker) printf ' #[fg=#6C7086]│#[fg=default] ' ;;
         *)          printf '  ' ;;
