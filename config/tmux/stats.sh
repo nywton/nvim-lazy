@@ -228,15 +228,10 @@ docker_seg() {
   local disk_c; disk_c=$(heat_abs "${disk_mb:-0}" 5120 20480)
   local disk_fmt; disk_fmt=$(awk -v m="$disk_mb" 'BEGIN { if (m >= 1024) printf "%.1fG", m / 1024; else printf "%dM", m }')
 
-  # mem_limit is the container memory cap and barely changes -- pad used to
-  # its width (same trick as ram()'s used/total).
-  local mu="${mem_used}M" ml="${mem_limit}M" mw=${#ml}
-  (( ${#mu} > mw )) && mw=${#mu}
-
-  printf '#[fg=%s]%s %-3s #[fg=%s]%s %-4s #[fg=%s]%s %-*s/%s #[fg=%s]%s %s' \
+  printf '#[fg=%s]%s %s #[fg=%s]%s %s%% #[fg=%s]%s %sM/%sM #[fg=%s]%s %s' \
     "$C_DOCKER" "$I_DOCKER" "$n" \
-    "$(heat "$cpu_sum")" "$I_CPU" "${cpu_sum}%" \
-    "$(heat "$mem_pct")" "$I_RAM" "$mw" "$mu" "$ml" \
+    "$(heat "$cpu_sum")" "$I_CPU" "$cpu_sum" \
+    "$(heat "$mem_pct")" "$I_RAM" "$mem_used" "$mem_limit" \
     "$disk_c" "$I_DISK" "$disk_fmt"
 }
 
