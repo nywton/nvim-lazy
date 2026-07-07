@@ -113,8 +113,8 @@ Plugin data and shell history are kept in named volumes, so nothing re-installs 
 - **Completion**: Neovim 0.12's built-in `'autocomplete'` (LSP + buffer words, popup as you type) — zero plugins
 - **Formatting on save**: [conform.nvim](https://github.com/stevearc/conform.nvim) — `stylua` (lua), `rubocop` (ruby), `black` (python). JS/TS/JSON/HTML/CSS/SCSS/ERB/Slim are formatted dependency-free via Treesitter re-indent ([`lua/config/tsformat.lua`](lua/config/tsformat.lua)) — indentation + whitespace only, no external tool
 - **Treesitter** highlighting (incl. js/ts/tsx/html/css/scss/erb/slim) + `nvim-ts-autotag`
-- **Fuzzy find**: telescope · **Git**: fugitive + gitsigns · **Nav**: harpoon
-- **UI**: catppuccin, lualine, indent-blankline, colorizer
+- **Fuzzy find**: telescope · **Git**: fugitive + gitsigns + diffview · **Nav**: harpoon
+- **UI**: catppuccin, lualine
 - **Terminal**: plugin-free toggleable float/split terminal that keeps its session alive when hidden (`<leader>tt` / `<leader>ts`)
 - **Neovide**: GUI tuning with [blurred floating windows](https://neovide.dev/features.html#blurred-floating-windows), shadows and cursor animations (only applied when run inside Neovide)
 

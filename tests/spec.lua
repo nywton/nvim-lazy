@@ -74,8 +74,8 @@ local expected = {
   "lazy.nvim",
   "nvim-treesitter", "nvim-ts-autotag", "conform.nvim",
   "telescope.nvim", "plenary.nvim", "harpoon", "vim-fugitive",
-  "gitsigns.nvim", "lualine.nvim", "catppuccin", "nvim-autopairs",
-  "nvim-colorizer.lua", "indent-blankline.nvim",
+  "diffview.nvim", "gitsigns.nvim", "lualine.nvim", "catppuccin",
+  "nvim-autopairs",
 }
 for _, name in ipairs(expected) do
   check("registered: " .. name, registered[name] == true, "not in lazy spec")
