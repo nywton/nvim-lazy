@@ -1,13 +1,32 @@
 local o = vim.opt
 local g = vim.g
 
+-- Native Windows (not WSL, which reports has("unix") == 1 too). Checked a few
+-- times below to swap Unix-only shell commands for Windows equivalents.
+local is_windows = vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1
+
+-- =====================
+-- Windows: use PowerShell for `:!`/system() calls (mix format, git
+-- helpers, etc.) instead of cmd.exe. This is the standard minimal recipe for
+-- Neovim on Windows — anything more elaborate (custom shellpipe/shellredir)
+-- risks breaking `:!`/system() output parsing, so it's deliberately left out.
+-- =====================
+if is_windows then
+	o.shell = "powershell"
+	o.shellcmdflag = "-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command"
+	o.shellquote = ""
+	o.shellxquote = ""
+end
+
 -- =====================
 -- netrw (built-in file explorer)
 -- =====================
 g.netrw_winsize = 80 -- width of netrw window
 g.netrw_banner = 0 -- remove banner
 g.netrw_keepdir = 1 -- keep netrw synced with the current directory
-g.netrw_localcopydircmd = "cp -r"
+-- `cp -r` doesn't exist on native Windows; PowerShell's Copy-Item is the
+-- closest equivalent for netrw's directory-copy command.
+g.netrw_localcopydircmd = is_windows and "Copy-Item -Recurse" or "cp -r"
 
 -- =====================
 -- Editor basics
@@ -87,6 +106,26 @@ if vim.fn.has("wsl") == 1 then
 		},
 		cache_enabled = 0,
 	}
+elseif is_windows then
+	-- =====================
+	-- Native Windows (terminal Neovim, not WSL): no bundled X11/win32
+	-- clipboard provider, so shell out to clip.exe/Get-Clipboard. List form
+	-- (argv, not a shell string) so this is unaffected by the `shell=
+	-- powershell` override above.
+	-- =====================
+	o.clipboard = "unnamedplus"
+	g.clipboard = {
+		name = "WindowsClipboard",
+		copy = {
+			["+"] = { "clip.exe" },
+			["*"] = { "clip.exe" },
+		},
+		paste = {
+			["+"] = { "powershell", "-NoProfile", "-NoLogo", "-Command", "Get-Clipboard -Raw" },
+			["*"] = { "powershell", "-NoProfile", "-NoLogo", "-Command", "Get-Clipboard -Raw" },
+		},
+		cache_enabled = 0,
+	}
 elseif vim.fn.has("linux") == 1 and not (vim.env.DISPLAY or vim.env.WAYLAND_DISPLAY) then
 	-- =====================
 	-- Headless Linux (Ubuntu server over SSH, docker): OSC 52 clipboard
@@ -127,9 +166,14 @@ vim.filetype.add({ extension = { slim = "slim" } })
 -- a shell started before install) leaves Neovim without `ruby`/`gem` — and
 -- with them the `ruby-lsp` and `rubocop` binaries this config expects on PATH.
 -- Prepend the shims here so Ruby is visible however Neovim was started.
-local rbenv_shims = vim.fn.expand("~/.rbenv/shims")
-if vim.fn.isdirectory(rbenv_shims) == 1 and not string.find(vim.env.PATH or "", rbenv_shims, 1, true) then
-  vim.env.PATH = rbenv_shims .. ":" .. (vim.env.PATH or "")
+-- rbenv is a Unix-only tool (no Windows install), and Windows' PATH separator
+-- is ";" rather than ":", so this whole block is skipped there — on Windows,
+-- put ruby/gem on PATH yourself (e.g. RubyInstaller) if you use ruby_lsp.
+if not is_windows then
+	local rbenv_shims = vim.fn.expand("~/.rbenv/shims")
+	if vim.fn.isdirectory(rbenv_shims) == 1 and not string.find(vim.env.PATH or "", rbenv_shims, 1, true) then
+		vim.env.PATH = rbenv_shims .. ":" .. (vim.env.PATH or "")
+	end
 end
 
 -- =====================

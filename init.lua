@@ -1,7 +1,6 @@
 require("config.lazy")
 require("config.settings")
 require("config.lsp")
-require("config.ctags")
 require("config.remap")
 require("config.terminal")
 require("config.neovide")

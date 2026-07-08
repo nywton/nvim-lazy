@@ -34,7 +34,7 @@ return {
 			{
 				"<leader>gM",
 				function()
-					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}'"))
 					local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
 					vim.cmd("Gvdiffsplit " .. ref)
 				end,
@@ -46,7 +46,7 @@ return {
 			{
 				"<leader>gi",
 				function()
-					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}'"))
 					local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
 					vim.cmd("Git log HEAD.." .. ref .. " --oneline")
 				end,
@@ -56,7 +56,7 @@ return {
 			{
 				"<leader>gd",
 				function()
-					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+					local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}'"))
 					local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
 					vim.cmd("Git difftool -y " .. ref)
 				end,
@@ -112,11 +112,11 @@ return {
 			{
 				"<leader>go",
 				function()
-					local has_orig = vim.fn.system("git rev-parse --verify ORIG_HEAD 2>/dev/null"):match("%S")
+					local has_orig = vim.fn.system("git rev-parse --verify ORIG_HEAD"):match("%S")
 					if has_orig then
 						vim.cmd("DiffviewOpen ORIG_HEAD")
 					else
-						local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+						local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}'"))
 						local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
 						vim.cmd("DiffviewOpen " .. ref)
 					end
@@ -126,11 +126,11 @@ return {
 			{
 				"<leader>gO",
 				function()
-					local has_orig = vim.fn.system("git rev-parse --verify ORIG_HEAD 2>/dev/null"):match("%S")
+					local has_orig = vim.fn.system("git rev-parse --verify ORIG_HEAD"):match("%S")
 					if has_orig then
 						vim.cmd("DiffviewFileHistory --range=ORIG_HEAD..HEAD")
 					else
-						local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}' 2>/dev/null"))
+						local upstream = vim.trim(vim.fn.system("git rev-parse --abbrev-ref '@{u}'"))
 						local ref = (vim.v.shell_error == 0 and upstream ~= "") and upstream or "origin/main"
 						vim.cmd("DiffviewFileHistory --range=" .. ref .. "..HEAD")
 					end
@@ -192,7 +192,7 @@ return {
 			-- Repo-wide hunk nav (]c/[c): the only copy — remap.lua no longer
 			-- duplicates this under g]/g[.
 			local function get_all_hunks()
-				local git_root = vim.trim(vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"))
+				local git_root = vim.trim(vim.fn.system("git rev-parse --show-toplevel"))
 				if vim.v.shell_error ~= 0 then
 					return {}
 				end
@@ -218,9 +218,9 @@ return {
 					end
 				end
 
-				parse_diff(vim.fn.systemlist("git -C " .. vim.fn.shellescape(git_root) .. " diff -U0 2>/dev/null"))
+				parse_diff(vim.fn.systemlist("git -C " .. vim.fn.shellescape(git_root) .. " diff -U0"))
 				parse_diff(
-					vim.fn.systemlist("git -C " .. vim.fn.shellescape(git_root) .. " diff -U0 --cached 2>/dev/null")
+					vim.fn.systemlist("git -C " .. vim.fn.shellescape(git_root) .. " diff -U0 --cached")
 				)
 
 				table.sort(hunks, function(a, b)

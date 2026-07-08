@@ -158,10 +158,14 @@ else
 	end, { desc = "Copy absolute path" })
 end
 
--- ctags/ripgrep fallback for gd/gr — LspAttach (lsp.lua) overrides these
--- buffer-locally when a language server is attached; LspDetach removes that
--- override so these globals take back over the moment LSP is off.
-vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (ctags)" })
+-- gd/gr fallback for filetypes/moments with no LSP attached — LspAttach
+-- (lsp.lua) overrides these buffer-locally when a language server is
+-- attached; LspDetach removes that override so these globals take back over.
+-- ctags auto-generation was dropped on this Windows/PowerShell-compat branch
+-- (its git-hook installer shells out to bash), so <C-]> only works if you
+-- generate a `tags` file yourself (e.g. `ctags -R`); telescope's grep_string
+-- below needs no tags file and is the main non-LSP navigation fallback here.
+vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (ctags, if a tags file exists)" })
 vim.keymap.set("n", "gr", function()
 	require("telescope.builtin").grep_string({ word_match = "-w" })
 end, { desc = "Find references (ripgrep)" })
