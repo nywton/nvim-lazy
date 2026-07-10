@@ -14,6 +14,11 @@ return {
       term_colors = false,
       integrations = {
         treesitter = true,
+        -- gitsigns.nvim itself isn't installed — this only defines the
+        -- GitSignsAdd/Change/Delete highlight groups, which lua/git/signs.lua
+        -- (our bare sign-column implementation) reuses so colors stay in
+        -- sync with the flavour/background without hardcoding hex here.
+        gitsigns = true,
       },
     })
     vim.o.cursorline = true

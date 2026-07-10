@@ -101,7 +101,7 @@ end
 print("# custom modules load cleanly")
 for _, mod in ipairs({
   "finder.files", "finder.grep", "finder.quickset",
-  "git.commands", "git.hunks", "ui.statusline",
+  "git.commands", "git.hunks", "git.signs", "ui.statusline",
 }) do
   check("require('" .. mod .. "')", (pcall(require, mod)))
 end

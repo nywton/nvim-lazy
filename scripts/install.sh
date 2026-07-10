@@ -95,7 +95,17 @@ install_nvim_linux() {
   latest="$(curl -fsSL https://api.github.com/repos/neovim/neovim/releases/latest \
     | grep '"tag_name"' | cut -d '"' -f 4)"
   [ -n "$latest" ] || die "could not resolve latest Neovim release"
-  info "Installing Neovim $latest ($asset)"
+
+  if command -v nvim >/dev/null 2>&1; then
+    local current; current="$(nvim --version | head -n1 | awk '{print $2}')"
+    if [ "$current" = "$latest" ]; then
+      ok "Neovim already at $latest"
+      return
+    fi
+    info "Updating Neovim $current -> $latest ($asset)"
+  else
+    info "Installing Neovim $latest ($asset)"
+  fi
 
   # NB: clean up explicitly rather than via `trap ... RETURN`. A RETURN trap is
   # global in bash, so it would also fire when the *caller* returns — by then
@@ -172,10 +182,18 @@ install_deps_macos() {
     eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
   fi
   info "Installing packages via Homebrew"
+  # `brew install` is a no-op on an already-installed formula — it does NOT
+  # upgrade it, so re-running this script would silently never update Neovim
+  # without this explicit branch.
+  if brew list --formula neovim >/dev/null 2>&1; then
+    brew upgrade neovim || true
+  else
+    brew install neovim || true
+  fi
   # Node-free: no node here.
   # tree-sitter is the CLI that nvim-treesitter's `main` branch shells out to
   # when compiling parsers (`tree-sitter build`).
-  brew install neovim git curl ripgrep fzf tree-sitter || true
+  brew install git curl ripgrep fzf tree-sitter || true
   ok "$(nvim --version | head -n1)"
 }
 

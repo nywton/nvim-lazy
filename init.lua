@@ -16,5 +16,6 @@ require("completion")
 require("ui.statusline")
 
 require("git.keymaps")
+require("git.signs").setup()
 require("terminal")
 require("neovide")
