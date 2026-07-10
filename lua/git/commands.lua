@@ -267,7 +267,7 @@ end
 
 -- Log of the CURRENT FILE only, with full patches (-p) — not a repo-wide
 -- overview. If you want the latter back, `git log --oneline --graph` in the
--- terminal (<leader>tt) is one line to type.
+-- terminal (<leader>t) is one line to type.
 function M.log()
   local root = git_root()
   if not root then

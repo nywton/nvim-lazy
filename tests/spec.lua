@@ -64,8 +64,7 @@ check("GitSignsChange highlight defined", vim.fn.hlexists("GitSignsChange") == 1
 check("GitSignsDelete highlight defined", vim.fn.hlexists("GitSignsDelete") == 1)
 
 print("# keymaps")
-check("<leader>tt -> terminal", vim.fn.maparg("<leader>tt", "n") ~= "")
-check("<leader>ts -> split terminal", vim.fn.maparg("<leader>ts", "n") ~= "")
+check("<leader>t -> terminal", vim.fn.maparg("<leader>t", "n") ~= "")
 check("<leader>e -> netrw toggle", vim.fn.maparg("<leader>e", "n") ~= "")
 check("; -> command mode", vim.fn.maparg(";", "n") ~= "")
 check("jj -> <Esc> (insert)", vim.fn.maparg("jj", "i") ~= "")
