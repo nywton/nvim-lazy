@@ -32,7 +32,7 @@ require("lazy").setup({
         "tarPlugin",
         "zipPlugin",
         "tohtml",
-         "tutor",
+        "tutor",
         "rplugin",
       },
     },
