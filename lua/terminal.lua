@@ -28,9 +28,10 @@ local function hide()
   end
 end
 
-local function toggle()
+local function show()
   if vim.api.nvim_win_is_valid(state.win) then
-    hide()
+    vim.api.nvim_set_current_win(state.win)
+    vim.cmd("startinsert")
     return
   end
 
@@ -47,15 +48,19 @@ local function toggle()
   vim.cmd("startinsert")
 end
 
-vim.keymap.set("n", "<leader>t", toggle, { desc = "Toggle/switch terminal" })
-vim.keymap.set("t", "<leader>t", toggle, { desc = "Toggle/switch terminal" })
-vim.keymap.set("t", "<Esc><Esc>", hide, { desc = "Terminal: hide" })
+vim.keymap.set("n", "<leader>t", show, { desc = "Open/focus terminal" })
 
+-- Two-stage Esc, scoped to the terminal buffer only (so it never shadows
+-- <leader>/<Esc> in normal buffers): first Esc drops out of insert/job mode
+-- into Terminal-Normal so you can use motions and visual mode on the
+-- scrollback; second Esc (already in normal mode) hides the float.
 vim.api.nvim_create_autocmd("TermOpen", {
-  callback = function()
+  callback = function(args)
     vim.opt_local.number = false
     vim.opt_local.relativenumber = false
     vim.opt_local.signcolumn = "no"
+    vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], { buffer = args.buf, desc = "Terminal: normal mode" })
+    vim.keymap.set("n", "<Esc>", hide, { buffer = args.buf, desc = "Terminal: hide" })
   end,
 })
 
