@@ -15,6 +15,3 @@ updates:
       interval: weekly
     commit-message:
       prefix: "docker"
-
-# Note: Neovim plugins pinned in lazy-lock.json are NOT a Dependabot ecosystem.
-# They are bumped by .github/workflows/update-plugins.yml (scheduled PR).

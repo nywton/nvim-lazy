@@ -6,12 +6,11 @@
 #   curl -fsSL https://raw.githubusercontent.com/nywton/nvim-lazy/main/scripts/install.sh | bash
 #
 # Re-running this script UPDATES everything (Neovim, system tools, the config
-# repo and all plugins). It is safe to run as often as you like.
+# repo). It is safe to run as often as you like.
 #
 # Overridable via environment variables:
 #   REPO_URL       git remote to clone           (default: https://github.com/nywton/nvim-lazy)
 #   NVIM_DIR       where the config lives         (default: $HOME/.config/nvim)
-#   NO_SYNC=1      skip the headless plugin sync  (default: unset → sync runs)
 #   NO_SHELL=1     skip zsh/oh-my-zsh setup       (default: unset → installs)
 #   NO_FONT=1      skip the Nerd Font install     (default: unset → installs)
 #   NO_TMUX=1      skip tmux + ~/.tmux.conf setup (default: unset → installs)
@@ -144,19 +143,17 @@ install_deps_linux() {
   info "Installing system packages via apt"
   export DEBIAN_FRONTEND=noninteractive
   $SUDO apt-get update -y
-  # No nodejs/npm on purpose — this config is Node-free. build-essential
-  # supplies the C compiler the tree-sitter CLI (installed below) shells out
-  # to when building parsers. ripgrep backs the finder (lua/finder/*.lua) and
-  # :grep. xclip / wl-clipboard back the "+/"* registers (system clipboard) so
-  # :checkhealth doesn't warn "No clipboard tool found". locales lets us
-  # generate a UTF-8 locale below. GUI-only packages (clipboard tools need an
-  # X/Wayland display, fontconfig only serves the Nerd Font) are dropped in
-  # headless-server mode.
+  # No nodejs/npm on purpose — this config is Node-free. ripgrep backs the
+  # finder (lua/finder/*.lua) and :grep. xclip / wl-clipboard back the "+/"*
+  # registers (system clipboard) so :checkhealth doesn't warn "No clipboard
+  # tool found". locales lets us generate a UTF-8 locale below. GUI-only
+  # packages (clipboard tools need an X/Wayland display, fontconfig only
+  # serves the Nerd Font) are dropped in headless-server mode.
   local gui_pkgs="xclip wl-clipboard fontconfig"
   [ -n "$HEADLESS" ] && gui_pkgs=""
   $SUDO apt-get install -y --no-install-recommends \
     ca-certificates curl git unzip tar locales \
-    build-essential ripgrep \
+    ripgrep \
     $gui_pkgs
   # Ensure a UTF-8 locale exists (Neovim's :checkhealth errors without one).
   if command -v locale-gen >/dev/null 2>&1; then
@@ -191,67 +188,8 @@ install_deps_macos() {
     brew install neovim || true
   fi
   # Node-free: no node here.
-  # tree-sitter is the CLI that nvim-treesitter's `main` branch shells out to
-  # when compiling parsers (`tree-sitter build`).
-  brew install git curl ripgrep fzf tree-sitter || true
+  brew install git curl ripgrep fzf || true
   ok "$(nvim --version | head -n1)"
-}
-
-# ----------------------------------------------------------------------------
-# tree-sitter CLI  (REQUIRED by nvim-treesitter `main`: parsers are built with
-# `tree-sitter build`, not a bare C compiler). Idempotent: skips when already
-# present. On Linux, tries apt first (Ubuntu 24.04+ ships tree-sitter-cli),
-# then falls back to the prebuilt GitHub release binary. macOS uses brew above.
-# ----------------------------------------------------------------------------
-install_tree_sitter_cli() {
-  # `tree-sitter build` (required by nvim-treesitter main) was added in v0.22.
-  # If the binary exists but is too old, fall through to upgrade it.
-  if command -v tree-sitter >/dev/null 2>&1 && tree-sitter build --help >/dev/null 2>&1; then
-    ok "tree-sitter CLI present ($(tree-sitter --version 2>/dev/null || echo unknown))"
-    return
-  fi
-  if command -v tree-sitter >/dev/null 2>&1; then
-    warn "tree-sitter $(tree-sitter --version 2>/dev/null) is too old (needs >= 0.22 for 'tree-sitter build'); upgrading"
-  fi
-
-  if [ "$OS" = "Darwin" ]; then
-    info "Installing tree-sitter CLI via Homebrew"
-    brew install tree-sitter && ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)" \
-      || warn "could not install tree-sitter via brew; install it manually"
-    return
-  fi
-
-  # Try apt first, but only keep it if it's actually new enough: Ubuntu noble's
-  # tree-sitter-cli package is stuck on 0.20.8 (pre-dates the `build` subcommand
-  # added in v0.22), so `apt-get install` exits 0 yet leaves a non-functional
-  # binary. Verify `tree-sitter build --help` before trusting it; otherwise fall
-  # through to the GitHub release below.
-  if command -v apt-get >/dev/null 2>&1 && apt-cache show tree-sitter-cli >/dev/null 2>&1; then
-    info "Installing tree-sitter-cli via apt"
-    if $SUDO apt-get install -y --no-install-recommends tree-sitter-cli \
-      && tree-sitter build --help >/dev/null 2>&1; then
-      ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)"
-      return
-    fi
-    warn "apt's tree-sitter-cli $(tree-sitter --version 2>/dev/null || echo '(unknown)') is too old or failed to install; falling back to GitHub release"
-  fi
-
-  # Fall back to the prebuilt GitHub release binary (works on older Ubuntu too).
-  case "$ARCH" in
-    x86_64)        local ta="tree-sitter-linux-x64.gz" ;;
-    aarch64|arm64) local ta="tree-sitter-linux-arm64.gz" ;;
-    *) warn "no tree-sitter CLI build for $ARCH; treesitter parsers won't compile"; return ;;
-  esac
-  info "Installing tree-sitter CLI from GitHub release ($ta)"
-  local tmp; tmp="$(mktemp -d)"
-  if curl -fL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/${ta}" -o "${tmp}/ts.gz"; then
-    gunzip -f "${tmp}/ts.gz"
-    $SUDO install -m 0755 "${tmp}/ts" /usr/local/bin/tree-sitter
-    ok "tree-sitter $(tree-sitter --version 2>/dev/null || echo installed)"
-  else
-    warn "could not download tree-sitter CLI; treesitter parsers won't compile until you install it"
-  fi
-  rm -rf "$tmp"
 }
 
 # ----------------------------------------------------------------------------
@@ -567,24 +505,6 @@ setup_config() {
 }
 
 # ----------------------------------------------------------------------------
-# plugins (headless) — installs/updates to the versions in lazy-lock.json
-# ----------------------------------------------------------------------------
-sync_plugins() {
-  [ "${NO_SYNC:-}" = "1" ] && { warn "NO_SYNC=1 → skipping plugin sync"; return; }
-  info "Syncing plugins (headless)…"
-  nvim --headless "+Lazy! sync" +qa || warn "plugin sync hit an error — open nvim and run :Lazy"
-  # nvim-treesitter `main` branch has no :TSUpdateSync, and :TSUpdate is async
-  # (it would return before downloads finish under --headless). Install the
-  # configured parsers synchronously via the Lua API; the list comes from the
-  # same module the plugin uses (lua/core/treesitter_parsers.lua).
-  info "Installing treesitter parsers (headless)…"
-  nvim --headless \
-    "+lua require('nvim-treesitter').install(require('core.treesitter_parsers')):wait(600000)" \
-    +qa || warn "treesitter parser install hit an error — open nvim and run :TSUpdate"
-  ok "plugins synced"
-}
-
-# ----------------------------------------------------------------------------
 main() {
   printf '%s\n' "${BOLD}nvim-lazy installer${RESET}  ($OS/$ARCH)"
   [ -n "$HEADLESS" ] && info "headless server detected → skipping GUI extras (kitty, Nerd Font, clipboard tools); force GUI setup with SERVER=0"
@@ -597,10 +517,8 @@ main() {
                         # install_kitty below copy files out of it
   install_shell        # zsh + oh-my-zsh + plugins (idempotent)
   install_tmux         # tmux + ~/.tmux.conf (only if absent)
-  install_tree_sitter_cli
   install_font         # JetBrainsMono Nerd Font (icons)
   install_kitty        # kitty terminal (optional — prompts the user)
-  sync_plugins
   printf '\n%s\n' "${GREEN}${BOLD}Done.${RESET} Launch with: ${BOLD}nvim${RESET}"
 }
 

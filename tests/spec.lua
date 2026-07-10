@@ -5,7 +5,6 @@
 --   nvim --headless -c "luafile tests/spec.lua" -c "qa!"
 --
 -- Exits non-zero if any check fails (so CI catches regressions).
--- Assumes plugins are already installed (run.sh / the Dockerfile do this).
 -- =====================================================================
 
 local pass, fail, warned = 0, 0, 0
@@ -36,7 +35,6 @@ end
 
 print("# config bootstrap")
 check("leader is <Space>", vim.g.mapleader == " ")
-check("lazy.nvim is loaded", pcall(require, "lazy"))
 
 print("# editor options (core/options.lua)")
 check("shiftwidth = 2", vim.o.shiftwidth == 2)
@@ -59,25 +57,11 @@ print(string.format("info - node on PATH: %s (not used by this config)",
   vim.fn.executable("node") == 1 and "yes" or "no"))
 soft("tmux", vim.fn.executable("tmux") == 1)
 
-print("# plugins registered with lazy")
-local registered = {}
-for _, p in ipairs(require("lazy").plugins()) do
-  registered[p.name] = true
-end
-local expected = { "lazy.nvim", "nvim-treesitter", "catppuccin" }
-for _, name in ipairs(expected) do
-  check("registered: " .. name, registered[name] == true, "not in lazy spec")
-end
--- This config deliberately keeps only the two plugins above (colorscheme +
--- treesitter) — everything else (finder, git, statusline, terminal, LSP nav
--- fallback) is plain Lua. Fail if something new sneaks into the spec unnoticed.
-local extra = {}
-for name, _ in pairs(registered) do
-  if name ~= "lazy.nvim" and name ~= "nvim-treesitter" and name ~= "catppuccin" then
-    table.insert(extra, name)
-  end
-end
-check("no unexpected plugins registered", #extra == 0, table.concat(extra, ", "))
+print("# colorscheme")
+check("colorscheme is habamax", vim.g.colors_name == "habamax")
+check("GitSignsAdd highlight defined", vim.fn.hlexists("GitSignsAdd") == 1)
+check("GitSignsChange highlight defined", vim.fn.hlexists("GitSignsChange") == 1)
+check("GitSignsDelete highlight defined", vim.fn.hlexists("GitSignsDelete") == 1)
 
 print("# keymaps")
 check("<leader>tt -> terminal", vim.fn.maparg("<leader>tt", "n") ~= "")
@@ -98,12 +82,6 @@ check("<leader>gp -> git push", vim.fn.maparg("<leader>gp", "n") ~= "")
 check("gd -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gd", "n") ~= "")
 check("gi -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gi", "n") ~= "")
 check("gr -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gr", "n") ~= "")
-
-print("# force-load lazy plugins and require their modules")
-pcall(function() require("lazy").load({ plugins = { "nvim-treesitter" } }) end)
-for _, mod in ipairs({ "nvim-treesitter", "catppuccin" }) do
-  check("require('" .. mod .. "')", (pcall(require, mod)))
-end
 
 print("# custom modules load cleanly")
 for _, mod in ipairs({

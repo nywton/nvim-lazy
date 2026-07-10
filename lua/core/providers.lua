@@ -34,8 +34,9 @@ elseif vim.fn.has("linux") == 1 and not (vim.env.DISPLAY or vim.env.WAYLAND_DISP
   end
 end
 
--- Filetypes core doesn't detect — without this the slim treesitter parser
--- never activates (FileType never fires).
+-- Filetypes core doesn't detect — without this, .slim files never get a
+-- filetype (FileType never fires), so legacy :syntax highlighting won't
+-- activate for them.
 vim.filetype.add({ extension = { slim = "slim" } })
 
 -- No LSP, no remote-plugin hosts — disable unused providers to silence

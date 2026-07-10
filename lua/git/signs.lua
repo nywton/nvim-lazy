@@ -1,8 +1,7 @@
 -- Bare sign-column indicators for uncommitted changes — the one feature lost
 -- by dropping gitsigns.nvim. Parses `git diff -U0` per-buffer and places
--- +/~/_ via extmarks (core API, no plugin). Colors come from catppuccin's
--- GitSignsAdd/Change/Delete highlight groups (plugins/colorscheme.lua enables
--- that integration purely for the highlight defs, not the plugin).
+-- +/~/_ via extmarks (core API, no plugin). Colors come from the
+-- GitSignsAdd/Change/Delete highlight groups defined in core/colorscheme.lua.
 --
 -- No current-line blame, no stage/reset-hunk from here — see git/hunks.lua
 -- for ]c/[c navigation and git/commands.lua's status buffer (`s`/`u`) for

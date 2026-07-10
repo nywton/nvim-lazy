@@ -6,10 +6,8 @@
 #   docker run -it --rm -v "$PWD:/work" neo-nvim        # drops you into zsh
 #   docker run -it --rm -v "$PWD:/work" neo-nvim nvim   # straight into Neovim
 #
-# Debian-slim (glibc) is used on purpose: the prebuilt Neovim / tree-sitter
-# release binaries are glibc builds and break on musl/alpine.
-# Trixie (glibc 2.41) over bookworm (2.36): the prebuilt tree-sitter CLI is now
-# linked against GLIBC_2.39 and won't run on bookworm.
+# Debian-slim (glibc) is used on purpose: the prebuilt Neovim release binary
+# is a glibc build and breaks on musl/alpine.
 FROM debian:trixie-slim
 
 ARG NVIM_VERSION=stable
@@ -19,12 +17,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TERM=xterm-256color
 
 # --- system packages -------------------------------------------------------
-# Build chain (treesitter parsers compile from C), search tools (ripgrep,
-# fzf — required by lua/finder/*.lua), zsh + tmux.
+# Search tools (ripgrep, fzf — required by lua/finder/*.lua), zsh + tmux.
 # No nodejs/npm — this config is deliberately Node-free.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git unzip tar locales \
-      build-essential \
       ripgrep fzf \
       zsh tmux \
     && rm -rf /var/lib/apt/lists/*
@@ -44,22 +40,6 @@ RUN set -eux; \
     rm /tmp/nvim.tar.gz; \
     nvim --version | head -n1
 
-# --- tree-sitter CLI -------------------------------------------------------
-# REQUIRED by nvim-treesitter `main`: parsers are compiled with `tree-sitter
-# build` (which then invokes the C toolchain installed above), not a bare cc.
-RUN set -eux; \
-    arch="$(dpkg --print-architecture)"; \
-    case "$arch" in \
-      amd64) ta="tree-sitter-linux-x64.gz" ;; \
-      arm64) ta="tree-sitter-linux-arm64.gz" ;; \
-      *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
-    esac; \
-    curl -fL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/${ta}" -o /tmp/ts.gz; \
-    gunzip -f /tmp/ts.gz; \
-    install -m 0755 /tmp/ts /usr/local/bin/tree-sitter; \
-    rm -f /tmp/ts; \
-    tree-sitter --version
-
 # --- non-root user ---------------------------------------------------------
 ARG USER=dev
 ARG UID=1000
@@ -76,7 +56,7 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
 COPY --chown=${USER}:${USER} docker/zshrc   /home/${USER}/.zshrc
 COPY --chown=${USER}:${USER} docker/tmux.conf /home/${USER}/.tmux.conf
 
-# --- the Neovim config + headless plugin install ---------------------------
+# --- the Neovim config -------------------------------------------------
 COPY --chown=${USER}:${USER} . /home/${USER}/.config/nvim
 # tmux status-bar stats helper (CPU/RAM/DISK/NET/Docker) — docker/tmux.conf
 # above shells out to this; single source of truth is config/tmux/stats.sh,
@@ -84,13 +64,6 @@ COPY --chown=${USER}:${USER} . /home/${USER}/.config/nvim
 RUN mkdir -p /home/${USER}/.config/tmux \
     && cp /home/${USER}/.config/nvim/config/tmux/stats.sh /home/${USER}/.config/tmux/stats.sh \
     && chmod +x /home/${USER}/.config/tmux/stats.sh
-# nvim-treesitter `main` branch: no :TSUpdateSync, and :TSUpdate is async, so
-# install the configured parsers synchronously via the Lua API. The parser list
-# comes from lua/core/treesitter_parsers.lua (shared with the plugin config).
-RUN nvim --headless "+Lazy! restore" +qa \
-    && nvim --headless \
-       "+lua require('nvim-treesitter').install(require('core.treesitter_parsers')):wait(600000)" \
-       +qa
 
 # Persist shell history and nvim data across `docker run`s (see compose file).
 VOLUME ["/home/dev/.local/share/nvim", "/home/dev/.zsh_history.d"]
