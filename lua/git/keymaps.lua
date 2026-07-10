@@ -23,7 +23,7 @@ vim.keymap.set("n", "<leader>g2", "<cmd>diffget //3<CR>", { desc = "Use their ve
 -- Finder + quickset (harpoon replacement) — grouped here since <C-p>/<leader>s
 -- aren't "editing" or "navigation" in the core sense, they're project tools.
 vim.keymap.set("n", "<C-p>", function() require("finder.files").find_files() end, { desc = "Find files" })
-vim.keymap.set("n", "<leader>s", function() require("finder.grep").live_grep() end, { desc = "Live grep" })
+vim.keymap.set("n", "<leader>s", function() require("finder.grep").live_grep() end, { desc = "Live grep (rg+fzf, floating, previewed)" })
 vim.keymap.set("n", "<leader>b", function()
   local bufs = vim.tbl_filter(function(b)
     return vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buflisted

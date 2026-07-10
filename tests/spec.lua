@@ -86,7 +86,7 @@ check("<leader>e -> netrw toggle", vim.fn.maparg("<leader>e", "n") ~= "")
 check("; -> command mode", vim.fn.maparg(";", "n") ~= "")
 check("jj -> <Esc> (insert)", vim.fn.maparg("jj", "i") ~= "")
 check("<C-p> -> rg+fzf find files", vim.fn.maparg("<C-p>", "n") ~= "")
-check("<leader>s -> rg live grep (quickfix)", vim.fn.maparg("<leader>s", "n") ~= "")
+check("<leader>s -> rg+fzf live grep (floating, previewed)", vim.fn.maparg("<leader>s", "n") ~= "")
 check("<leader>gg -> git status", vim.fn.maparg("<leader>gg", "n") ~= "")
 check("<leader>gb -> toggle inline git blame", vim.fn.maparg("<leader>gb", "n") ~= "")
 check("<leader>gB -> full-file git blame", vim.fn.maparg("<leader>gB", "n") ~= "")
@@ -107,7 +107,7 @@ end
 
 print("# custom modules load cleanly")
 for _, mod in ipairs({
-  "finder.files", "finder.grep", "finder.quickset",
+  "finder.files", "finder.grep", "finder.picker", "finder.quickset",
   "git.commands", "git.hunks", "git.signs", "git.blame", "ui.statusline",
 }) do
   check("require('" .. mod .. "')", (pcall(require, mod)))
