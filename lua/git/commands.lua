@@ -24,21 +24,44 @@ local function scratch(cmd, ft, name)
   return buf
 end
 
--- Diff shown in the status preview pane for one entry: untracked files have
--- nothing to diff against in the index/HEAD, so compare against /dev/null;
--- everything else diffs straight against HEAD (covers staged + unstaged in
--- one call — same approach as git/signs.lua).
-local function preview_diff(root, code, file)
+-- Diff command for the status preview pane, run inside a terminal buffer
+-- (not a plain scratch one) so --word-diff=color's ANSI output — the
+-- intra-line word highlighting git itself computes — renders as real
+-- colors instead of raw escape codes. Untracked files have nothing to diff
+-- against in the index/HEAD, so compare against /dev/null; everything else
+-- diffs straight against HEAD (covers staged + unstaged in one call — same
+-- approach as git/signs.lua).
+local function preview_diff_cmd(root, code, file)
   if code:sub(1, 1) == "?" then
-    return vim.fn.systemlist({ "git", "-C", root, "diff", "--no-index", "--", "/dev/null", file })
+    return { "git", "-C", root, "diff", "--no-index", "--color=always", "--word-diff=color", "--", "/dev/null", file }
   end
-  return vim.fn.systemlist({ "git", "-C", root, "diff", "HEAD", "--", file })
+  return { "git", "-C", root, "diff", "HEAD", "--color=always", "--word-diff=color", "--", file }
+end
+
+-- Fugitive-style section grouping for the status list. A file can land in
+-- BOTH Staged and Unstaged (e.g. "MM": staged, then modified again) — real
+-- git semantics, so it gets one entry per section, not just one overall.
+local SECTION_ORDER = { "Conflicted", "Staged", "Unstaged", "Untracked" }
+local CONFLICT_CODES = {
+  DD = true, AU = true, UD = true, UA = true, DU = true, AA = true, UU = true,
+}
+
+local function classify(code)
+  if CONFLICT_CODES[code] then
+    return { "Conflicted" }
+  end
+  if code:sub(1, 1) == "?" then
+    return { "Untracked" }
+  end
+  local sections = {}
+  if code:sub(1, 1) ~= " " then table.insert(sections, "Staged") end
+  if code:sub(2, 2) ~= " " then table.insert(sections, "Unstaged") end
+  return sections
 end
 
 -- Floating, centered status picker with a live diff preview — the git
--- equivalent of telescope's git_status. No plugin: two floating scratch
--- windows (list + preview), the preview re-rendered on CursorMoved and
--- highlighted with the `diff` Treesitter parser (core/treesitter_parsers.lua).
+-- equivalent of telescope's git_status. No plugin: two floating windows
+-- (a scratch list + a terminal buffer replaced on every CursorMoved).
 function M.status()
   local root = git_root()
   if not root then
@@ -59,9 +82,7 @@ function M.status()
   local preview_buf = vim.api.nvim_create_buf(false, true)
   vim.bo[list_buf].buftype = "nofile"
   vim.bo[list_buf].bufhidden = "wipe"
-  vim.bo[preview_buf].buftype = "nofile"
   vim.bo[preview_buf].bufhidden = "wipe"
-  vim.bo[preview_buf].filetype = "diff"
 
   local list_win = vim.api.nvim_open_win(list_buf, true, {
     relative = "editor",
@@ -88,6 +109,7 @@ function M.status()
   vim.wo[preview_win].wrap = false
 
   local entries = {}
+  local header_ns = vim.api.nvim_create_namespace("git_status_headers")
 
   local function set_lines(buf, lines)
     vim.bo[buf].modifiable = true
@@ -96,24 +118,73 @@ function M.status()
     vim.bo[buf].modified = false
   end
 
+  -- Renders "Section (N)" headers (bold, like fugitive) followed by its
+  -- entries and a blank separator. entries[lnum] stays nil for header/blank
+  -- lines, which every other function here already treats as "no file".
   local function load_entries()
     local out = vim.fn.systemlist({ "git", "-C", root, "status", "--short" })
-    entries = {}
+    local buckets = { Conflicted = {}, Staged = {}, Unstaged = {}, Untracked = {} }
     for _, line in ipairs(out) do
-      table.insert(entries, { code = line:sub(1, 2), file = line:sub(4) })
+      local code, file = line:sub(1, 2), line:sub(4)
+      for _, section in ipairs(classify(code)) do
+        table.insert(buckets[section], { code = code, file = file, section = section })
+      end
     end
-    set_lines(list_buf, #out > 0 and out or { "(clean)" })
+
+    entries = {}
+    local rendered = {}
+    local header_lines = {}
+    for _, section in ipairs(SECTION_ORDER) do
+      local items = buckets[section]
+      if #items > 0 then
+        table.insert(rendered, string.format("%s (%d)", section, #items))
+        header_lines[#rendered] = true
+        for _, item in ipairs(items) do
+          table.insert(rendered, string.format("  %s %s", item.code, item.file))
+          entries[#rendered] = item
+        end
+        table.insert(rendered, "")
+      end
+    end
+    if #rendered > 0 then
+      table.remove(rendered) -- drop the trailing blank separator
+    else
+      rendered = { "(clean)" }
+    end
+
+    set_lines(list_buf, rendered)
+    vim.api.nvim_buf_clear_namespace(list_buf, header_ns, 0, -1)
+    for lnum in pairs(header_lines) do
+      vim.api.nvim_buf_set_extmark(list_buf, header_ns, lnum - 1, 0, {
+        end_col = #rendered[lnum],
+        hl_group = "Title",
+      })
+    end
   end
 
   local function update_preview()
-    if not vim.api.nvim_win_is_valid(list_win) then
+    if not vim.api.nvim_win_is_valid(list_win) or not vim.api.nvim_win_is_valid(preview_win) then
       return
     end
     local lnum = vim.api.nvim_win_get_cursor(list_win)[1]
     local entry = entries[lnum]
-    local diff_lines = entry and preview_diff(root, entry.code, entry.file) or {}
-    set_lines(preview_buf, #diff_lines > 0 and diff_lines or { entry and "(no diff)" or "" })
-    pcall(vim.treesitter.start, preview_buf, "diff")
+
+    -- A fresh buffer per refresh: a terminal buffer is inert once its job
+    -- exits, so "updating" the preview means swapping in a new one rather
+    -- than rewriting lines. bufhidden=wipe cleans up the old one the moment
+    -- it stops being displayed (right after nvim_win_set_buf below).
+    local new_buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[new_buf].bufhidden = "wipe"
+    vim.api.nvim_win_set_buf(preview_win, new_buf)
+
+    if entry then
+      local cur_win = vim.api.nvim_get_current_win()
+      vim.api.nvim_set_current_win(preview_win)
+      vim.fn.jobstart(preview_diff_cmd(root, entry.code, entry.file), { term = true })
+      vim.api.nvim_set_current_win(cur_win)
+    else
+      vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, { "(clean)" })
+    end
   end
 
   load_entries()
@@ -151,12 +222,20 @@ function M.status()
   end, "Open file")
   map("s", function()
     local entry = entries[vim.api.nvim_win_get_cursor(list_win)[1]]
-    if entry then
-      vim.fn.system({ "git", "-C", root, "add", "--", entry.file })
-      load_entries()
-      update_preview()
+    if not entry then
+      return
     end
-  end, "Stage file")
+    -- Smart toggle: unstage a Staged entry, stage anything else
+    -- (Unstaged/Untracked/Conflicted — `git add` also resolves a conflict
+    -- once you've hand-edited out the markers, matching plain git usage).
+    if entry.section == "Staged" then
+      vim.fn.system({ "git", "-C", root, "restore", "--staged", "--", entry.file })
+    else
+      vim.fn.system({ "git", "-C", root, "add", "--", entry.file })
+    end
+    load_entries()
+    update_preview()
+  end, "Stage/unstage file (toggle)")
   map("u", function()
     local entry = entries[vim.api.nvim_win_get_cursor(list_win)[1]]
     if entry then
@@ -186,13 +265,70 @@ function M.blame()
   scratch("git -C " .. vim.fn.shellescape(root) .. " blame -- " .. vim.fn.shellescape(file), "git", "git-blame")
 end
 
+-- Log of the CURRENT FILE only, with full patches (-p) — not a repo-wide
+-- overview. If you want the latter back, `git log --oneline --graph` in the
+-- terminal (<leader>tt) is one line to type.
 function M.log()
   local root = git_root()
   if not root then
     vim.notify("Not a git repo", vim.log.levels.WARN)
     return
   end
-  scratch("git -C " .. vim.fn.shellescape(root) .. " log --oneline --graph -n 200", "git", "git-log")
+  local file = vim.fn.expand("%:.")
+  scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -- " .. vim.fn.shellescape(file), "git", "git-log")
+end
+
+-- Repo-wide counterpart to M.log() — full patches (-p), not scoped to the
+-- current file. Capped at 200 commits like the old --oneline overview was,
+-- since -p output is a lot bigger per commit.
+function M.log_repo()
+  local root = git_root()
+  if not root then
+    vim.notify("Not a git repo", vim.log.levels.WARN)
+    return
+  end
+  scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -n 200", "git", "git-log")
+end
+
+function M.stage_file()
+  local root = git_root()
+  if not root then
+    vim.notify("Not a git repo", vim.log.levels.WARN)
+    return
+  end
+  vim.fn.system({ "git", "-C", root, "add", "--", vim.fn.expand("%:p") })
+  vim.notify("Staged " .. vim.fn.expand("%:."), vim.log.levels.INFO)
+end
+
+function M.unstage_file()
+  local root = git_root()
+  if not root then
+    vim.notify("Not a git repo", vim.log.levels.WARN)
+    return
+  end
+  vim.fn.system({ "git", "-C", root, "restore", "--staged", "--", vim.fn.expand("%:p") })
+  vim.notify("Unstaged " .. vim.fn.expand("%:."), vim.log.levels.INFO)
+end
+
+-- Interactive (needs $EDITOR / credentials) — a real terminal, not a wrapper.
+function M.commit()
+  local root = git_root()
+  if not root then
+    vim.notify("Not a git repo", vim.log.levels.WARN)
+    return
+  end
+  vim.cmd("vnew | terminal git -C " .. vim.fn.shellescape(root) .. " commit")
+  vim.cmd("startinsert")
+end
+
+function M.push()
+  local root = git_root()
+  if not root then
+    vim.notify("Not a git repo", vim.log.levels.WARN)
+    return
+  end
+  vim.cmd("vnew | terminal git -C " .. vim.fn.shellescape(root) .. " push")
+  vim.cmd("startinsert")
 end
 
 return M
