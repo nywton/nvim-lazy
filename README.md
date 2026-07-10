@@ -111,7 +111,7 @@ Plugin data and shell history are kept in named volumes, so nothing re-installs 
 - **File finding** (`<C-p>`): `rg --files` piped through `fzf` in a terminal buffer (`lua/finder/files.lua`)
 - **Content search** (`<leader>s`): ripgrep straight into the quickfix list, navigated with `<C-k>`/`<C-j>`
 - **Quickset** (`<leader>a` add / `<C-e>` menu / `<C-h>`,`<C-t>` prev-next): a ~30-line harpoon-style hand-picked file list, session-local, no persistence
-- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status, with `<CR>`/`s`/`u` to open/stage/unstage), `<leader>gd` (diff), `<leader>gb` (blame), `<leader>gl` (log), `]c`/`[c` (repo-wide uncommitted-hunk navigation). Anything interactive/stateful (commit, push, pull, rebase) — use the terminal (`<leader>tt`) directly.
+- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status, with `<CR>`/`s`/`u` to open/stage/unstage), `<leader>gd` (diff), `<leader>gb` (toggle inline current-line blame, virtual text), `<leader>gB` (full-file blame history, scratch buffer), `<leader>gl` (log), `]c`/`[c` (repo-wide uncommitted-hunk navigation). Anything interactive/stateful (commit, push, pull, rebase) — use the terminal (`<leader>tt`) directly.
 - **UI**: catppuccin (colorscheme) + a built-in `vim.o.statusline` (mode, branch, diagnostics count, filename, filetype, clock, position) — no lualine
 - **Terminal**: plugin-free toggleable float/split terminal that keeps its session alive when hidden (`<leader>tt` / `<leader>ts`)
 - **Neovide**: GUI tuning with [blurred floating windows](https://neovide.dev/features.html#blurred-floating-windows), shadows and cursor animations (only applied when run inside Neovide)
@@ -154,7 +154,8 @@ Leader is `<Space>`. `:map <leader>` / `:verbose map <lhs>` show what's bound; t
 | `<leader>s` | Live grep → quickfix (`<C-k>`/`<C-j>` to navigate) |
 | `gd` / `gi` / `gr` | Go to word occurrence (rg + fzf) |
 | `<leader>gg` | Git status (scratch buffer: `<CR>` open, `s` stage, `u` unstage) |
-| `<leader>gd` / `gb` / `gl` | Git diff / blame / log |
+| `<leader>gd` / `gl` | Git diff / log |
+| `<leader>gb` / `gB` | Toggle inline current-line blame / full-file blame history |
 | `]c` / `[c` | Next/previous uncommitted hunk, repo-wide |
 | `<leader>a` / `<C-e>` / `<C-h>` / `<C-t>` | Quickset: add / menu / prev / next |
 | `<leader>tt` / `<leader>ts` | Toggle floating / split terminal |

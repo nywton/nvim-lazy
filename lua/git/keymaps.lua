@@ -1,9 +1,11 @@
 local git = require("git.commands")
 local hunks = require("git.hunks")
+local blame = require("git.blame")
 
 vim.keymap.set("n", "<leader>gg", git.status, { desc = "Git status" })
 vim.keymap.set("n", "<leader>gd", function() git.diff() end, { desc = "Git diff" })
-vim.keymap.set("n", "<leader>gb", git.blame, { desc = "Git blame" })
+vim.keymap.set("n", "<leader>gb", function() blame.toggle() end, { desc = "Toggle inline git blame" })
+vim.keymap.set("n", "<leader>gB", git.blame, { desc = "Git blame (full file history)" })
 vim.keymap.set("n", "<leader>gl", git.log, { desc = "Git log of current file (-p)" })
 vim.keymap.set("n", "<leader>gL", git.log_repo, { desc = "Git log -p (repo-wide)" })
 vim.keymap.set("n", "<leader>gs", git.stage_file, { desc = "Git stage current file" })
