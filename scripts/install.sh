@@ -11,11 +11,7 @@
 # Overridable via environment variables:
 #   REPO_URL       git remote to clone           (default: https://github.com/nywton/nvim-lazy)
 #   NVIM_DIR       where the config lives         (default: $HOME/.config/nvim)
-#   RUBY_VERSION   Ruby to install via rbenv      (default: 3.4.9)
-#   RUBY_SETUP     when rvm/system Ruby exists:    (default: unset → asks)
-#                  =update (rbenv) or =skip (keep existing)
 #   NO_SYNC=1      skip the headless plugin sync  (default: unset → sync runs)
-#   NO_RUBY=1      skip rbenv + Ruby setup        (default: unset → installs)
 #   NO_SHELL=1     skip zsh/oh-my-zsh setup       (default: unset → installs)
 #   NO_FONT=1      skip the Nerd Font install     (default: unset → installs)
 #   NO_TMUX=1      skip tmux + ~/.tmux.conf setup (default: unset → installs)
@@ -28,9 +24,6 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/nywton/nvim-lazy}"
 NVIM_DIR="${NVIM_DIR:-$HOME/.config/nvim}"
-# Ruby is installed via rbenv for ruby_lsp (LSP) + rubocop (formatter).
-# Override the pinned version with RUBY_VERSION=..., or skip it with NO_RUBY=1.
-RUBY_VERSION="${RUBY_VERSION:-3.4.9}"
 
 # ----------------------------------------------------------------------------
 # pretty logging
@@ -119,16 +112,32 @@ install_nvim_linux() {
   ok "$(nvim --version | head -n1)"
 }
 
+# ----------------------------------------------------------------------------
+# fzf  (required by the finder: lua/finder/files.lua and lua/finder/grep.lua's
+# goto_word() pipe ripgrep through it). Core dependency, not a shell nicety —
+# installed unconditionally, independent of NO_SHELL.
+# ----------------------------------------------------------------------------
+install_fzf() {
+  command -v fzf >/dev/null 2>&1 && { ok "fzf present"; return; }
+  info "Installing fzf"
+  if [ "$OS" = "Darwin" ]; then
+    brew install fzf || true
+  else
+    $SUDO apt-get install -y --no-install-recommends fzf 2>/dev/null \
+      || { clone_or_update https://github.com/junegunn/fzf.git "$HOME/.fzf" \
+           && "$HOME/.fzf/install" --key-bindings --completion --no-update-rc >/dev/null; }
+  fi
+}
+
 install_deps_linux() {
   command -v apt-get >/dev/null 2>&1 || die "this script supports apt-based distros (Ubuntu/Debian). Install deps manually otherwise."
   info "Installing system packages via apt"
   export DEBIAN_FRONTEND=noninteractive
   $SUDO apt-get update -y
-  # No nodejs/npm on purpose — this config is Node-free. Treesitter parsers are
-  # built by the tree-sitter CLI (installed below) which invokes this C
-  # toolchain. JS/TS/HTML/CSS are formatted dependency-free via Treesitter
-  # (no biome/Node). python3/pip back the black formatter.
-  # xclip / wl-clipboard back the "+/"* registers (system clipboard) so
+  # No nodejs/npm on purpose — this config is Node-free. build-essential
+  # supplies the C compiler the tree-sitter CLI (installed below) shells out
+  # to when building parsers. ripgrep backs the finder (lua/finder/*.lua) and
+  # :grep. xclip / wl-clipboard back the "+/"* registers (system clipboard) so
   # :checkhealth doesn't warn "No clipboard tool found". locales lets us
   # generate a UTF-8 locale below. GUI-only packages (clipboard tools need an
   # X/Wayland display, fontconfig only serves the Nerd Font) are dropped in
@@ -137,14 +146,8 @@ install_deps_linux() {
   [ -n "$HEADLESS" ] && gui_pkgs=""
   $SUDO apt-get install -y --no-install-recommends \
     ca-certificates curl git unzip tar locales \
-    build-essential cmake ninja-build gettext pkg-config \
-    ripgrep fd-find universal-ctags \
-    python3 python3-pip python3-venv \
+    build-essential ripgrep \
     $gui_pkgs
-  # Debian/Ubuntu ship fd as `fdfind`; expose the conventional `fd` name.
-  if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
-    $SUDO ln -sf "$(command -v fdfind)" /usr/local/bin/fd
-  fi
   # Ensure a UTF-8 locale exists (Neovim's :checkhealth errors without one).
   if command -v locale-gen >/dev/null 2>&1; then
     $SUDO sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || true
@@ -159,6 +162,7 @@ install_deps_linux() {
     export LANG=en_US.UTF-8
   fi
   install_nvim_linux
+  install_fzf
 }
 
 install_deps_macos() {
@@ -171,8 +175,7 @@ install_deps_macos() {
   # Node-free: no node here.
   # tree-sitter is the CLI that nvim-treesitter's `main` branch shells out to
   # when compiling parsers (`tree-sitter build`).
-  # rbenv + ruby-build provide the Ruby toolchain (see install_ruby).
-  brew install neovim git curl cmake ninja ripgrep fd stylua tree-sitter rbenv ruby-build universal-ctags || true
+  brew install neovim git curl ripgrep fzf tree-sitter || true
   ok "$(nvim --version | head -n1)"
 }
 
@@ -235,7 +238,7 @@ install_tree_sitter_cli() {
 
 # ----------------------------------------------------------------------------
 # JetBrainsMono Nerd Font  (the icon font the UI/Neovide expect — see
-# lua/config/neovide.lua). Idempotent; skip with NO_FONT=1. Set your terminal
+# lua/neovide.lua). Idempotent; skip with NO_FONT=1. Set your terminal
 # emulator to use "JetBrainsMono Nerd Font" afterwards (Neovide picks it up
 # automatically).
 # ----------------------------------------------------------------------------
@@ -280,10 +283,11 @@ clone_or_update() {
 }
 
 # ----------------------------------------------------------------------------
-# Shell: zsh + oh-my-zsh + zsh-autosuggestions + zsh-syntax-highlighting + fzf.
+# Shell: zsh + oh-my-zsh + zsh-autosuggestions + zsh-syntax-highlighting.
 # Idempotent: installs what's missing, updates what's present, and configures
 # ~/.zshrc via a single guarded block (never clobbers your existing config).
-# Skip entirely with NO_SHELL=1.
+# Skip entirely with NO_SHELL=1. (fzf itself is a core dependency, installed
+# unconditionally by install_fzf — this only wires its zsh key-bindings.)
 # ----------------------------------------------------------------------------
 install_shell() {
   [ "${NO_SHELL:-}" = "1" ] && { warn "NO_SHELL=1 → skipping zsh/oh-my-zsh setup"; return; }
@@ -294,20 +298,6 @@ install_shell() {
   else
     info "Installing zsh"
     if [ "$OS" = "Linux" ]; then $SUDO apt-get install -y --no-install-recommends zsh; else brew install zsh || true; fi
-  fi
-
-  # --- fzf (fuzzy finder) ---
-  if command -v fzf >/dev/null 2>&1; then
-    ok "fzf present"
-  else
-    info "Installing fzf"
-    if [ "$OS" = "Linux" ]; then
-      $SUDO apt-get install -y --no-install-recommends fzf 2>/dev/null \
-        || { clone_or_update https://github.com/junegunn/fzf.git "$HOME/.fzf" \
-             && "$HOME/.fzf/install" --key-bindings --completion --no-update-rc >/dev/null; }
-    else
-      brew install fzf || true
-    fi
   fi
 
   # --- oh-my-zsh (KEEP_ZSHRC: don't let the installer rewrite ~/.zshrc) ---
@@ -461,181 +451,6 @@ install_tmux() {
 }
 
 # ----------------------------------------------------------------------------
-# Ruby (via rbenv)  —  required for ruby-lsp (LSP) and rubocop (formatter),
-# both installed as gems below. rbenv keeps Ruby in $HOME, no system Ruby needed.
-# ----------------------------------------------------------------------------
-RBENV_ROOT="${RBENV_ROOT:-$HOME/.rbenv}"
-
-# Make the rbenv Ruby usable for the rest of THIS script run.
-load_rbenv() {
-  export RBENV_ROOT
-  export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
-  command -v rbenv >/dev/null 2>&1 && eval "$(rbenv init - bash)" 2>/dev/null || true
-}
-
-# Persist rbenv in the user's interactive shells so Neovim (and the terminals
-# it spawns) can find the Ruby that backs ruby_lsp / rubocop.
-persist_rbenv_to_shell() {
-  local rc sh
-  for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-    [ -e "$rc" ] || continue
-    if grep -q 'rbenv init' "$rc" 2>/dev/null; then continue; fi
-    case "$rc" in *zshrc) sh="zsh" ;; *) sh="bash" ;; esac
-    {
-      printf '\n# rbenv (added by nvim-lazy installer)\n'
-      printf 'export RBENV_ROOT="$HOME/.rbenv"\n'
-      printf 'export PATH="$RBENV_ROOT/bin:$PATH"\n'
-      printf 'eval "$(rbenv init - %s)"\n' "$sh"
-    } >> "$rc"
-    ok "added rbenv init to $(basename "$rc")"
-  done
-}
-
-install_ruby() {
-  [ "${NO_RUBY:-}" = "1" ] && { warn "NO_RUBY=1 → skipping Ruby/rbenv setup"; return; }
-
-  # If Ruby is already managed elsewhere — rvm, or a system/other `ruby` that
-  # isn't our own rbenv shim — don't silently take it over. Ask whether to
-  # update via rbenv or keep (and use) the existing install. RUBY_SETUP can
-  # preset the answer for unattended runs: RUBY_SETUP=update | RUBY_SETUP=skip.
-  local has_rvm="" sys_ruby="" sys_ver=""
-  { command -v rvm >/dev/null 2>&1 || [ -d "$HOME/.rvm" ]; } && has_rvm=1
-  if command -v ruby >/dev/null 2>&1; then
-    case "$(command -v ruby)" in
-      "$RBENV_ROOT"/*) : ;;   # already our rbenv Ruby — fine to manage below
-      *) sys_ruby="$(command -v ruby)"; sys_ver="$(ruby -v 2>/dev/null | awk '{print $2}')" ;;
-    esac
-  fi
-
-  if [ -n "$has_rvm" ] || [ -n "$sys_ruby" ]; then
-    local found="" choice
-    [ -n "$has_rvm" ]  && found="rvm"
-    [ -n "$sys_ruby" ] && found="${found:+$found, }Ruby ${sys_ver:-?} at $sys_ruby"
-    warn "Existing Ruby toolchain detected: $found"
-    choice="${RUBY_SETUP:-$(prompt "Update Ruby via rbenv ([u]pdate) or skip and use the existing version ([s]kip)? [u/S] " skip)}"
-    case "$choice" in
-      u|U|update|Update|UPDATE) info "Updating Ruby via rbenv (per your choice)" ;;
-      *) ok "Keeping existing Ruby — skipping rbenv setup"; return ;;
-    esac
-  fi
-
-  if [ "$OS" = "Linux" ]; then
-    # ruby-build needs these to compile Ruby (libyaml is mandatory for 3.4+).
-    info "Installing Ruby build dependencies"
-    $SUDO apt-get install -y --no-install-recommends \
-      autoconf patch bison \
-      libssl-dev libyaml-dev libreadline-dev zlib1g-dev \
-      libncurses-dev libffi-dev libgdbm-dev libdb-dev uuid-dev || true
-    if [ ! -d "$RBENV_ROOT" ]; then
-      info "Installing rbenv + ruby-build"
-      git clone --depth=1 https://github.com/rbenv/rbenv.git "$RBENV_ROOT"
-      git clone --depth=1 https://github.com/rbenv/ruby-build.git "$RBENV_ROOT/plugins/ruby-build"
-    else
-      info "Updating rbenv + ruby-build"
-      git -C "$RBENV_ROOT" pull --ff-only 2>/dev/null || true
-      git -C "$RBENV_ROOT/plugins/ruby-build" pull --ff-only 2>/dev/null || true
-    fi
-  fi
-  # macOS gets rbenv + ruby-build from brew (see install_deps_macos).
-
-  load_rbenv
-  command -v rbenv >/dev/null 2>&1 || { warn "rbenv not available; skipping Ruby $RUBY_VERSION"; return; }
-
-  if rbenv versions --bare 2>/dev/null | grep -qx "$RUBY_VERSION"; then
-    ok "Ruby $RUBY_VERSION already installed"
-  else
-    info "Installing Ruby $RUBY_VERSION via rbenv (compiles from source — a few minutes)"
-    rbenv install -s "$RUBY_VERSION" || { warn "could not build Ruby $RUBY_VERSION; 'rbenv install $RUBY_VERSION' manually"; return; }
-  fi
-  rbenv global "$RUBY_VERSION"
-  rbenv rehash 2>/dev/null || true
-  persist_rbenv_to_shell
-  ok "ruby $(ruby -v 2>/dev/null | awk '{print $2}')"
-}
-
-# ----------------------------------------------------------------------------
-# stylua  (lua formatter — prebuilt release binary)
-# ----------------------------------------------------------------------------
-install_stylua() {
-  command -v stylua >/dev/null 2>&1 && { ok "stylua present"; return; }
-  [ "$OS" = "Darwin" ] && return   # installed via brew above
-
-  case "$ARCH" in
-    x86_64)        local sa="stylua-linux-x86_64.zip" ;;
-    aarch64|arm64) local sa="stylua-linux-aarch64.zip" ;;
-    *) warn "no stylua build for $ARCH; skipping"; return ;;
-  esac
-  info "Installing stylua ($sa)"
-  local tmp; tmp="$(mktemp -d)"
-  if curl -fL "https://github.com/JohnnyMorganz/StyLua/releases/latest/download/${sa}" -o "${tmp}/stylua.zip"; then
-    unzip -o -q "${tmp}/stylua.zip" -d "${tmp}"
-    $SUDO install -m 0755 "${tmp}/stylua" /usr/local/bin/stylua
-    ok "stylua installed"
-  else
-    warn "could not download stylua; install it manually for lua formatting"
-  fi
-  rm -rf "$tmp"
-}
-
-# ----------------------------------------------------------------------------
-# Install a gem under EVERY installed rbenv Ruby, not just whichever version
-# happens to be active/global right now. `command -v <gem's bin>` is a false
-# positive under rbenv: it finds the shim as soon as ONE version has the gem,
-# even if the currently active (or a project-pinned .ruby-version) version
-# doesn't — that's what let ruby-lsp silently go missing for a second Ruby
-# version here. Actually invoking the shim (`--version`) is what rbenv itself
-# uses to resolve "is this installed for the active version", so that's the
-# check we mirror per-version below.
-# ----------------------------------------------------------------------------
-install_gem_everywhere() {
-  local gem_name="$1" bin_name="$2" label="$3"
-  if ! command -v rbenv >/dev/null 2>&1; then
-    if command -v gem >/dev/null 2>&1 && ! command -v "$bin_name" >/dev/null 2>&1; then
-      info "Installing $label"
-      gem install "$gem_name" >/dev/null 2>&1 || warn "could not install $gem_name; 'gem install $gem_name' manually"
-    elif ! command -v gem >/dev/null 2>&1; then
-      warn "ruby/gem not found — skipping $label (install ruby, then 'gem install $gem_name')"
-    fi
-    return
-  fi
-
-  local v
-  for v in $(rbenv versions --bare 2>/dev/null); do
-    if RBENV_VERSION="$v" rbenv exec "$bin_name" --version >/dev/null 2>&1; then
-      continue
-    fi
-    info "Installing $label for Ruby $v"
-    RBENV_VERSION="$v" rbenv exec gem install "$gem_name" >/dev/null 2>&1 \
-      || warn "could not install $gem_name for Ruby $v; 'RBENV_VERSION=$v gem install $gem_name' manually"
-  done
-  rbenv rehash 2>/dev/null || true
-}
-
-# ----------------------------------------------------------------------------
-# language formatters used by conform.nvim  (best-effort)
-# ----------------------------------------------------------------------------
-install_formatters() {
-  install_stylua
-
-  if command -v pip3 >/dev/null 2>&1 && ! command -v black >/dev/null 2>&1; then
-    info "Installing black (python formatter)"
-    pip3 install --user --quiet black 2>/dev/null \
-      || pip3 install --user --quiet --break-system-packages black 2>/dev/null \
-      || warn "could not install black; 'pip3 install black' manually"
-  fi
-
-  install_gem_everywhere rubocop rubocop "rubocop (ruby formatter)"
-}
-
-# ----------------------------------------------------------------------------
-# LSP servers  (plain binaries on PATH — no Mason). lua/config/lsp.lua starts
-# them with the core vim.lsp.enable(); nothing downloads at editor runtime.
-# ----------------------------------------------------------------------------
-install_lsp_servers() {
-  install_gem_everywhere ruby-lsp ruby-lsp "ruby-lsp (ruby LSP)"
-}
-
-# ----------------------------------------------------------------------------
 # kitty terminal  —  optional; prompts before installing unless NO_KITTY is set.
 # Installs kitty, drops config/kitty.conf from this repo into ~/.config/kitty/,
 # and sets kitty as the default x-terminal-emulator (Linux only; macOS users
@@ -743,10 +558,10 @@ sync_plugins() {
   # nvim-treesitter `main` branch has no :TSUpdateSync, and :TSUpdate is async
   # (it would return before downloads finish under --headless). Install the
   # configured parsers synchronously via the Lua API; the list comes from the
-  # same module the plugin uses (lua/config/treesitter_parsers.lua).
+  # same module the plugin uses (lua/core/treesitter_parsers.lua).
   info "Installing treesitter parsers (headless)…"
   nvim --headless \
-    "+lua require('nvim-treesitter').install(require('config.treesitter_parsers')):wait(600000)" \
+    "+lua require('nvim-treesitter').install(require('core.treesitter_parsers')):wait(600000)" \
     +qa || warn "treesitter parser install hit an error — open nvim and run :TSUpdate"
   ok "plugins synced"
 }
@@ -764,9 +579,6 @@ main() {
                         # install_kitty below copy files out of it
   install_shell        # zsh + oh-my-zsh + plugins (idempotent)
   install_tmux         # tmux + ~/.tmux.conf (only if absent)
-  install_ruby         # rbenv + pinned Ruby (before formatters: rubocop needs gem)
-  install_formatters
-  install_lsp_servers  # ruby-lsp (gem) — no Mason
   install_tree_sitter_cli
   install_font         # JetBrainsMono Nerd Font (icons)
   install_kitty        # kitty terminal (optional — prompts the user)

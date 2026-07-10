@@ -1,4 +1,7 @@
--- Bootstrap lazy.nvim
+-- Bootstrap lazy.nvim. Only two plugins survive the refactor here:
+-- nvim-treesitter (parser install/highlighting) and catppuccin (colorscheme
+-- has no built-in equivalent of comparable quality — see the tutorial's
+-- Phase 3 for why this one plugin is kept deliberately).
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
   local lazyrepo = "https://github.com/folke/lazy.nvim.git"
@@ -15,29 +18,15 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- Make sure to setup `mapleader` and `maplocalleader` before
--- loading lazy.nvim so that mappings are correct.
--- This is also a good place to setup other settings (vim.opt)
-vim.g.mapleader = " "
-vim.g.maplocalleader = "\\"
-
--- Setup lazy.nvim
 require("lazy").setup({
   spec = {
-    -- import your plugins
     { import = "plugins" },
   },
-  -- Configure any other settings here. See the documentation for more details.
-  -- colorscheme that will be used when installing plugins.
   install = { colorscheme = { "habamax" } },
-  -- automatically check for plugin updates (silently; see :Lazy for results)
   checker = { enabled = true, notify = false },
-  -- No plugin in this config needs luarocks; disabling it stops lazy from
-  -- bootstrapping hererocks and clears the :checkhealth luarocks ERROR.
   rocks = { enabled = false },
   performance = {
     rtp = {
-      -- Built-in plugins this config never uses (netrw stays — <leader>e).
       disabled_plugins = {
         "gzip",
         "tarPlugin",

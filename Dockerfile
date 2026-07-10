@@ -6,8 +6,8 @@
 #   docker run -it --rm -v "$PWD:/work" neo-nvim        # drops you into zsh
 #   docker run -it --rm -v "$PWD:/work" neo-nvim nvim   # straight into Neovim
 #
-# Debian-slim (glibc) is used on purpose: the prebuilt Neovim / stylua /
-# tree-sitter release binaries are glibc builds and break on musl/alpine.
+# Debian-slim (glibc) is used on purpose: the prebuilt Neovim / tree-sitter
+# release binaries are glibc builds and break on musl/alpine.
 # Trixie (glibc 2.41) over bookworm (2.36): the prebuilt tree-sitter CLI is now
 # linked against GLIBC_2.39 and won't run on bookworm.
 FROM debian:trixie-slim
@@ -19,20 +19,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TERM=xterm-256color
 
 # --- system packages -------------------------------------------------------
-# Build chain (treesitter parsers compile from C), search tools (ripgrep, the
-# silver searcher, fd), zsh + tmux, and Python (for the black formatter).
+# Build chain (treesitter parsers compile from C), search tools (ripgrep,
+# fzf — required by lua/finder/*.lua), zsh + tmux.
 # No nodejs/npm — this config is deliberately Node-free.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git unzip tar locales \
-      build-essential cmake ninja-build gettext pkg-config \
-      ripgrep silversearcher-ag fd-find \
+      build-essential \
+      ripgrep fzf \
       zsh tmux \
-      python3 python3-pip python3-venv \
-    && ln -sf "$(command -v fdfind)" /usr/local/bin/fd \
     && rm -rf /var/lib/apt/lists/*
-
-# black backs conform.nvim's python formatting.
-RUN pip3 install --no-cache-dir --break-system-packages black
 
 # --- Neovim (official release tarball, latest stable) ----------------------
 RUN set -eux; \
@@ -48,18 +43,6 @@ RUN set -eux; \
     ln -sf /opt/neovim/bin/nvim /usr/local/bin/nvim; \
     rm /tmp/nvim.tar.gz; \
     nvim --version | head -n1
-
-# --- stylua (lua formatter for conform.nvim) -------------------------------
-RUN set -eux; \
-    arch="$(dpkg --print-architecture)"; \
-    case "$arch" in \
-      amd64) sa="stylua-linux-x86_64.zip" ;; \
-      arm64) sa="stylua-linux-aarch64.zip" ;; \
-    esac; \
-    curl -fL "https://github.com/JohnnyMorganz/StyLua/releases/latest/download/${sa}" -o /tmp/stylua.zip; \
-    unzip -o /tmp/stylua.zip -d /tmp; \
-    install -m 0755 /tmp/stylua /usr/local/bin/stylua; \
-    rm -f /tmp/stylua.zip /tmp/stylua
 
 # --- tree-sitter CLI -------------------------------------------------------
 # REQUIRED by nvim-treesitter `main`: parsers are compiled with `tree-sitter
@@ -103,10 +86,10 @@ RUN mkdir -p /home/${USER}/.config/tmux \
     && chmod +x /home/${USER}/.config/tmux/stats.sh
 # nvim-treesitter `main` branch: no :TSUpdateSync, and :TSUpdate is async, so
 # install the configured parsers synchronously via the Lua API. The parser list
-# comes from lua/config/treesitter_parsers.lua (shared with the plugin config).
+# comes from lua/core/treesitter_parsers.lua (shared with the plugin config).
 RUN nvim --headless "+Lazy! restore" +qa \
     && nvim --headless \
-       "+lua require('nvim-treesitter').install(require('config.treesitter_parsers')):wait(600000)" \
+       "+lua require('nvim-treesitter').install(require('core.treesitter_parsers')):wait(600000)" \
        +qa
 
 # Persist shell history and nvim data across `docker run`s (see compose file).

@@ -38,7 +38,7 @@ print("# config bootstrap")
 check("leader is <Space>", vim.g.mapleader == " ")
 check("lazy.nvim is loaded", pcall(require, "lazy"))
 
-print("# editor options (settings.lua)")
+print("# editor options (core/options.lua)")
 check("shiftwidth = 2", vim.o.shiftwidth == 2)
 check("expandtab on", vim.o.expandtab == true)
 check("number on", vim.o.number == true)
@@ -46,23 +46,17 @@ check("termguicolors on", vim.o.termguicolors == true)
 check("undofile on", vim.o.undofile == true)
 
 print("# external tools on PATH")
+-- This config has no LSP, no ctags, and no format-on-save by design — code
+-- navigation and search are entirely rg+fzf (lua/finder/*.lua), so both are
+-- hard requirements, not optional.
 check("ripgrep (rg)", vim.fn.executable("rg") == 1)
 check("git", vim.fn.executable("git") == 1)
-check("fd / fdfind", vim.fn.executable("fd") == 1 or vim.fn.executable("fdfind") == 1)
-check("stylua (lua formatter)", vim.fn.executable("stylua") == 1)
+check("fzf", vim.fn.executable("fzf") == 1)
 -- This config is Node-free by design. We can't assert node is absent (the
 -- host may have it for unrelated work), but nothing here installs or requires
 -- it — the suite passes with no JS runtime present (proven in the container/CI).
 print(string.format("info - node on PATH: %s (not used by this config)",
   vim.fn.executable("node") == 1 and "yes" or "no"))
--- LSP servers and gem/pip formatters are host-dependent (installed by
--- scripts/install.sh, not by any plugin), so report without failing.
--- (JS/TS/HTML/CSS/ERB are formatted dependency-free via Treesitter re-indent;
--- see lua/config/tsformat.lua. No biome / Node tooling is involved.)
-soft("ruby-lsp (ruby lsp, via gem)", vim.fn.executable("ruby-lsp") == 1)
-soft("black (python formatter)", vim.fn.executable("black") == 1)
-soft("rubocop (ruby formatter)", vim.fn.executable("rubocop") == 1)
-soft("the silver searcher (ag)", vim.fn.executable("ag") == 1)
 soft("tmux", vim.fn.executable("tmux") == 1)
 
 print("# plugins registered with lazy")
@@ -70,16 +64,20 @@ local registered = {}
 for _, p in ipairs(require("lazy").plugins()) do
   registered[p.name] = true
 end
-local expected = {
-  "lazy.nvim",
-  "nvim-treesitter", "nvim-ts-autotag", "conform.nvim",
-  "telescope.nvim", "plenary.nvim", "harpoon", "vim-fugitive",
-  "diffview.nvim", "gitsigns.nvim", "lualine.nvim", "catppuccin",
-  "nvim-autopairs",
-}
+local expected = { "lazy.nvim", "nvim-treesitter", "catppuccin" }
 for _, name in ipairs(expected) do
   check("registered: " .. name, registered[name] == true, "not in lazy spec")
 end
+-- This config deliberately keeps only the two plugins above (colorscheme +
+-- treesitter) — everything else (finder, git, statusline, terminal, LSP nav
+-- fallback) is plain Lua. Fail if something new sneaks into the spec unnoticed.
+local extra = {}
+for name, _ in pairs(registered) do
+  if name ~= "lazy.nvim" and name ~= "nvim-treesitter" and name ~= "catppuccin" then
+    table.insert(extra, name)
+  end
+end
+check("no unexpected plugins registered", #extra == 0, table.concat(extra, ", "))
 
 print("# keymaps")
 check("<leader>tt -> terminal", vim.fn.maparg("<leader>tt", "n") ~= "")
@@ -87,35 +85,26 @@ check("<leader>ts -> split terminal", vim.fn.maparg("<leader>ts", "n") ~= "")
 check("<leader>e -> netrw toggle", vim.fn.maparg("<leader>e", "n") ~= "")
 check("; -> command mode", vim.fn.maparg(";", "n") ~= "")
 check("jj -> <Esc> (insert)", vim.fn.maparg("jj", "i") ~= "")
-check("<C-f> -> telescope git_files", vim.fn.maparg("<C-f>", "n") ~= "")
-check("<leader>s -> live_grep", vim.fn.maparg("<leader>s", "n") ~= "")
+check("<C-p> -> rg+fzf find files", vim.fn.maparg("<C-p>", "n") ~= "")
+check("<leader>s -> rg live grep (quickfix)", vim.fn.maparg("<leader>s", "n") ~= "")
+check("<leader>gg -> git status", vim.fn.maparg("<leader>gg", "n") ~= "")
+check("gd -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gd", "n") ~= "")
+check("gi -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gi", "n") ~= "")
+check("gr -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gr", "n") ~= "")
 
 print("# force-load lazy plugins and require their modules")
-local to_load = {
-  "telescope.nvim", "nvim-treesitter", "conform.nvim",
-  "gitsigns.nvim", "lualine.nvim",
-}
-pcall(function() require("lazy").load({ plugins = to_load }) end)
-
-for _, mod in ipairs({
-  "telescope", "nvim-treesitter", "conform",
-  "gitsigns", "lualine",
-}) do
+pcall(function() require("lazy").load({ plugins = { "nvim-treesitter" } }) end)
+for _, mod in ipairs({ "nvim-treesitter", "catppuccin" }) do
   check("require('" .. mod .. "')", (pcall(require, mod)))
 end
 
-print("# LSP / completion / formatting wiring")
--- In 0.11+ vim.lsp.config is a callable *table*; vim.lsp.enable is a function.
-check("vim.lsp.config API present (nvim 0.11+)", vim.lsp.config ~= nil and type(vim.lsp.enable) == "function")
--- Servers are configured through core (lua/config/lsp.lua), no mason/lspconfig.
-check("ruby_lsp configured via vim.lsp.config", vim.lsp.config.ruby_lsp ~= nil and vim.lsp.config.ruby_lsp.cmd ~= nil)
-check("built-in 'autocomplete' enabled (nvim 0.12)", vim.o.autocomplete == true)
-local conform_ok, conform = pcall(require, "conform")
-check("conform formatters_by_ft has lua/ruby/python",
-  conform_ok and conform.formatters_by_ft
-    and conform.formatters_by_ft.lua ~= nil
-    and conform.formatters_by_ft.ruby ~= nil
-    and conform.formatters_by_ft.python ~= nil)
+print("# custom modules load cleanly")
+for _, mod in ipairs({
+  "finder.files", "finder.grep", "finder.quickset",
+  "git.commands", "git.hunks", "ui.statusline",
+}) do
+  check("require('" .. mod .. "')", (pcall(require, mod)))
+end
 
 -- ---------------------------------------------------------------------
 print(string.rep("-", 50))

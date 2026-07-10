@@ -37,7 +37,9 @@ jobs:
       - name: Update plugins
         run: |
           nvim --headless "+Lazy! update" +qa
-          nvim --headless "+TSUpdateSync" +qa 2>/dev/null || true
+          nvim --headless \
+            "+lua require('nvim-treesitter').install(require('core.treesitter_parsers')):wait(600000)" \
+            +qa 2>/dev/null || true
 
       - name: Open PR if lazy-lock.json changed
         uses: peter-evans/create-pull-request@v6

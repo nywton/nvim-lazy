@@ -4,8 +4,8 @@
 #   docker compose run --rm dev     # zsh shell (your CWD is mounted at /work)
 #   docker compose run --rm dev nvim
 #
-# Named volumes keep your shell history and Neovim data (lazy plugins, mason
-# servers, treesitter parsers, undo) between runs so nothing re-installs.
+# Named volumes keep your shell history and Neovim data (lazy plugins,
+# treesitter parsers, undo) between runs so nothing re-installs.
 services:
   dev:
     build:
