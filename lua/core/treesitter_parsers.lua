@@ -19,4 +19,5 @@ return {
   "gitignore",
   "ruby",
   "python",
+  "diff", -- git status preview pane (lua/git/commands.lua)
 }
