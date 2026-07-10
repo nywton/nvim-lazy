@@ -2,87 +2,78 @@
 
 [![CI](https://github.com/nywton/nvim-lazy/actions/workflows/ci.yml/badge.svg)](https://github.com/nywton/nvim-lazy/actions/workflows/ci.yml)
 
-A minimal, **Node-free**, **zero-plugin** Lua config. Runs on **Ubuntu/Debian, macOS**, and in a **Docker** container.
+A minimal, **Node-free**, **zero-plugin** Lua config. No plugin manager, no lockfile, nothing to bootstrap — just Neovim core plus a couple of external CLI tools for search. Runs on **Ubuntu/Debian, macOS**, and in **Docker**.
 
-Requires Neovim **0.12.0+** (built-in `'autocomplete'` needs it).
+> **Zero plugins, full stop:** no plugin manager, no colorscheme plugin, no treesitter plugin — just Neovim core (built-in `habamax` colorscheme, built-in `:syntax` highlighting). No LSP, no ctags, no format-on-save, no completion plugin, no Mason.
 
-> **Zero plugins, full stop:** no plugin manager, no colorscheme plugin, no treesitter plugin — just Neovim core (built-in `habamax` colorscheme, built-in `:syntax` highlighting) plus two external CLI tools (`ripgrep`, `fzf`) for search. No LSP, no ctags, no format-on-save, no completion plugin, no Mason.
+Requires **Neovim 0.12.0+** (built-in `'autocomplete'` needs it).
 
 ---
 
 ## Requirements
 
-The one-command installer and the Docker image (both under [Quick start](#quick-start)) set all of this up for you. This list matters only if you install **manually** or onto an unusual environment.
-
-### Required
-
-| Dependency | Why |
+| Tool | Why |
 |---|---|
-| **Neovim 0.12.0+** | The built-in `'autocomplete'` option (this config's only completion source) needs it. |
-| **git, curl, unzip, tar** | git backs the git integration (`lua/git/*.lua`) and cloning this repo; curl/unzip/tar download the Neovim release tarball and Nerd Font zip in the installer. |
-| **ripgrep** (`rg`) | Backs every search: `:grep`, `<leader>s`, and the `gd`/`gi`/`gr` code-navigation fallback (`lua/finder/*.lua`). |
-| **fzf** | The interactive picker for file finding (`<C-p>`) and code navigation (`gd`/`gi`/`gr`), run inside a terminal buffer — see `lua/finder/files.lua` and `lua/finder/grep.lua`. |
-| **A UTF-8 locale** (e.g. `en_US.UTF-8`) | Neovim's `:checkhealth` errors without one; unicode UI glyphs need it. |
+| **Neovim 0.12.0+** | Built-in `'autocomplete'` is this config's only completion source. |
+| **git** | Backs the git integration (`lua/git/*.lua`) and clones this repo. |
+| **ripgrep** (`rg`) | Every search: `:grep`, `<leader>s`, and the `gd`/`gi`/`gr` navigation fallback. |
+| **fzf** | The interactive picker for file finding (`<C-p>`) and code navigation. |
+| **curl, unzip, tar** | Only needed to download Neovim/the Nerd Font — skip if you install those another way. |
+| **A UTF-8 locale** | `:checkhealth` errors without one. |
 
-### Recommended
+Recommended: a clipboard tool (`xclip`/`wl-clipboard` on Linux, built-in on macOS) for the `"+`/`"*` registers, and a [Nerd Font](#fonts) for terminal-UI icons.
 
-| Dependency | Why |
-|---|---|
-| **System clipboard tool** | The `"+`/`"*` registers. `xclip` or `wl-clipboard` on Linux; built in on macOS (`pbcopy`); auto-wired on WSL (`clip.exe`); falls back to OSC 52 over SSH with neither. |
-| **A [Nerd Font](#fonts)** | Icons in the terminal UI. Installed automatically (JetBrainsMono Nerd Font); set your terminal to use it. |
-
-### Installed automatically by the installer — nothing to do
-
-- **Shell** — `zsh` + [oh-my-zsh](https://ohmyz.sh) + `zsh-autosuggestions` + `zsh-syntax-highlighting`, wired into `~/.zshrc` via a guarded block. Skip with `NO_SHELL=1`. (Setting zsh as your login shell is left to you: `chsh -s "$(command -v zsh)"`.)
-
-### Explicitly *not* required
-
-- **A plugin manager** — no lazy.nvim, packer, or vim-plug; nothing to bootstrap or lock.
-- **Node.js / npm** — never installed or run.
-- **Ruby / rbenv, or any language server** — there's no LSP in this config. `gd`/`gi`/`gr` are a bare ripgrep+fzf picker instead (see [What's inside](#whats-inside)).
-- **stylua / black / rubocop, or any formatter** — nothing formats on save. Format manually with whatever tool you like, or add it back yourself if you want it.
-- **ctags** — removed entirely; no tags file is generated or consumed.
+Not required: a plugin manager, Node.js/npm, Ruby/rbenv, any LSP or formatter, ctags.
 
 ---
 
-## Quick start
+## Install
 
-### Local (Ubuntu / Debian / macOS) — one command
+### Script — one command
 
-Installs Neovim (latest stable, 0.12+), the required tools, and clones this repo to `~/.config/nvim`. **Re-run it any time to update everything.**
+Installs Neovim, the tools above, and clones this repo to `~/.config/nvim`. Idempotent — re-run any time to update everything.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nywton/nvim-lazy/main/scripts/install.sh | bash
 ```
 
-Then just run `nvim`.
-
-Already cloned? Update in place:
-
-```bash
-~/.config/nvim/scripts/install.sh        # or: cd ~/.config/nvim && git pull
-```
+Already cloned? `~/.config/nvim/scripts/install.sh` (or just `git pull`) updates in place.
 
 <details>
-<summary>What the script installs</summary>
+<summary>What it sets up, and how to configure it</summary>
 
-- **Neovim** — latest stable from the official GitHub release (tarball on Linux, brew on macOS)
-- **System tools** — `git curl unzip`, `ripgrep`, `fzf`, and `xclip`/`wl-clipboard` (system clipboard)
-- **Locale** — generates `en_US.UTF-8` if missing (Neovim's `:checkhealth` errors without a UTF-8 locale)
-- **Shell** — `zsh` + [oh-my-zsh](https://ohmyz.sh), `zsh-autosuggestions`, `zsh-syntax-highlighting`; wired into `~/.zshrc` via a single guarded block (your existing `~/.zshrc` is never overwritten)
-- **tmux** — `tmux`, a dependency-free `~/.config/tmux/stats.sh`, and a Catppuccin Mocha `~/.tmux.conf` (pure tmux, no TPM/plugins). Single status line at the bottom: session name on the left, window list centered, and on the right — machine │ user │ a plain-ASCII, color-coded (green/yellow/red by load) system navbar (CPU/RAM/DISK/NET, plus GPU and a Docker summary — containers, CPU%, mem, disk, IO — when either is detected) │ IP │ clock. Labels are plain ASCII rather than Nerd Font icons so they render in any terminal without a special font. To add a stat, edit `config/tmux/stats.sh` and re-run the installer — no `tmux.conf` changes needed. The base config is written only if you don't already have one; the status bar is added/refreshed on **every** run via a guarded managed block, so re-running picks it up even on top of an existing config. Skip with `NO_TMUX=1`
-- **Font** — JetBrainsMono Nerd Font into `~/.local/share/fonts` (Linux) or via brew cask (macOS); skip with `NO_FONT=1`
+- **Neovim** — latest stable from the official GitHub release
+- **ripgrep, fzf, git, curl, unzip** — via apt/brew
+- **zsh** + oh-my-zsh + autosuggestions + syntax-highlighting, wired into `~/.zshrc` — skip with `NO_SHELL=1`
+- **tmux** + a dependency-free status line (`config/tmux/stats.sh`) — skip with `NO_TMUX=1`
+- **JetBrainsMono Nerd Font** — skip with `NO_FONT=1`
+- A UTF-8 locale, generated if missing
 
-Every step is **idempotent** — re-run any time to update; already-installed pieces are just checked/updated.
+On a headless server (no `$DISPLAY`/`$WAYLAND_DISPLAY`) it auto-skips GUI extras (kitty, the font, clipboard packages); force with `SERVER=1`, opt back in with `SERVER=0`. Clipboard still works over SSH via [OSC 52](https://neovim.io/doc/user/provider.html#clipboard-osc52).
 
-On a **headless server** (Linux with no `$DISPLAY`/`$WAYLAND_DISPLAY` — e.g. Ubuntu over SSH) the script automatically skips the GUI extras: kitty, the Nerd Font, and the `xclip`/`wl-clipboard`/`fontconfig` packages. Force this mode with `SERVER=1`, or opt back into the GUI bits with `SERVER=0`. Clipboard still works over SSH: Neovim falls back to [OSC 52](https://neovim.io/doc/user/provider.html#clipboard-osc52) (yanks land in your *local* clipboard), and the installer's tmux block sets `set-clipboard on` so it passes through tmux — your local terminal just needs OSC 52 support (kitty, iTerm2, WezTerm, Ghostty, Windows Terminal).
-
-Override defaults with env vars: `REPO_URL`, `NVIM_DIR`, `NO_SHELL=1`, `NO_TMUX=1`, `NO_FONT=1`, `NO_KITTY=1`, `SERVER=1`.
+Other env vars: `REPO_URL`, `NVIM_DIR`, `NO_KITTY=1`.
 </details>
 
-### Docker — disposable, batteries-included
+### Manual — step by step
 
-A thin Debian-slim image with Neovim + this config, plus `zsh` (oh-my-zsh, autosuggestions, syntax-highlighting, **big persistent history**), `tmux`, `ripgrep` and `fzf`.
+1. **Install Neovim 0.12+.** Get the latest stable release for your platform from the [Neovim releases page](https://github.com/neovim/neovim/releases), or `brew install neovim` on macOS.
+2. **Install the required tools:**
+   ```bash
+   # Debian/Ubuntu
+   sudo apt-get install git ripgrep fzf curl unzip
+
+   # macOS
+   brew install git ripgrep fzf curl
+   ```
+3. **Clone this repo to `~/.config/nvim`** (back up any existing config first):
+   ```bash
+   mv ~/.config/nvim ~/.config/nvim.bak 2>/dev/null
+   git clone https://github.com/nywton/nvim-lazy ~/.config/nvim
+   ```
+4. **(Optional) Install a [Nerd Font](#fonts)** for terminal-UI icons.
+5. Launch with `nvim`. No further setup steps — no plugin sync, nothing to build.
+
+### Docker — disposable, batteries-included
 
 ```bash
 docker compose build              # build once
@@ -103,34 +94,30 @@ Shell history is kept in a named volume, so it survives restarts.
 
 ## What's inside
 
-- **Syntax highlighting**: Neovim's built-in legacy `:syntax` engine covers most filetypes (json/js/ts/tsx/yaml/html/css/scss/erb/slim/bash/dockerfile/ruby/python/...); lua/vim/vimdoc/markdown get native treesitter highlighting out of the box — no plugin either way
+- **Syntax highlighting**: Neovim's built-in legacy `:syntax` engine covers most filetypes; lua/vim/vimdoc/markdown get native treesitter highlighting out of the box — no plugin either way
 - **Completion**: Neovim 0.12's built-in `'autocomplete'` (buffer/window words — no LSP source, no completion plugin)
-- **Code navigation** (`gd`/`gi`/`gr`): no LSP, no ctags — ripgrep searches the word under the cursor repo-wide, `fzf` picks the match (`lua/finder/grep.lua`). All three land on the same picker since there's no server to disambiguate definition/implementation/references.
-- **File finding** (`<C-p>`): `rg --files` piped through `fzf` in a terminal buffer (`lua/finder/files.lua`)
+- **Code navigation** (`gd`/`gi`/`gr`): no LSP, no ctags — ripgrep searches the word under the cursor repo-wide, `fzf` picks the match
+- **File finding** (`<C-p>`): `rg --files` piped through `fzf` in a terminal buffer
 - **Content search** (`<leader>s`): ripgrep straight into the quickfix list, navigated with `<C-k>`/`<C-j>`
-- **Quickset** (`<leader>a` add / `<C-e>` menu / `<C-h>`,`<C-t>` prev-next): a ~30-line harpoon-style hand-picked file list, session-local, no persistence
-- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status, with `<CR>`/`s`/`u` to open/stage/unstage), `<leader>gd` (diff), `<leader>gb` (toggle inline current-line blame, virtual text), `<leader>gB` (full-file blame history, scratch buffer), `<leader>gl` (log), `]c`/`[c` (repo-wide uncommitted-hunk navigation). Anything interactive/stateful (commit, push, pull, rebase) — use the terminal (`<leader>t`) directly.
-- **UI**: habamax (built-in colorscheme, transparent background) + a built-in `vim.o.statusline` (mode, branch, diagnostics count, filename, filetype, clock, position) — no lualine
-- **Terminal**: plugin-free toggleable floating terminal that keeps its session alive when hidden (`<leader>t`); `<Esc><Esc>` hides it from terminal mode, and the shell exiting closes it automatically (no "[Process exited]" prompt to dismiss)
-- **Neovide**: GUI tuning with [blurred floating windows](https://neovide.dev/features.html#blurred-floating-windows), shadows and cursor animations (only applied when run inside Neovide)
+- **Quickset** (`<leader>a` add / `<C-e>` menu / `<C-h>`,`<C-t>` prev-next): a ~30-line harpoon-style hand-picked file list, session-local
+- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status), `<leader>gd` (diff), `<leader>gb`/`gB` (blame), `<leader>gl` (log), `]c`/`[c` (hunk navigation). Interactive/stateful commands (commit, push, pull, rebase) — use the terminal (`<leader>t`) directly.
+- **UI**: habamax (built-in colorscheme, transparent background) + a built-in `vim.o.statusline` — no lualine
+- **Terminal**: plugin-free toggleable floating terminal (`<leader>t`); `<Esc><Esc>` hides it, and the shell exiting closes it automatically
+- **Neovide**: GUI tuning with blurred floating windows, shadows, and cursor animations (only applied when run inside Neovide)
 
-Not in this config, by design: a plugin manager, treesitter, LSP, ctags, format-on-save, a completion plugin, Mason, telescope, fugitive/gitsigns/diffview, harpoon, lualine, autopairs, ts-autotag. See the commit history around the `nvim2` refactor for the reasoning behind each removal.
+Not in this config, by design: a plugin manager, treesitter, LSP, ctags, format-on-save, a completion plugin, Mason, telescope, fugitive/gitsigns/diffview, harpoon, lualine, autopairs, ts-autotag.
 
 ## Tests
-
-Headless feature tests cover plugin registration, keymaps, options, and required external tools:
 
 ```bash
 tests/run.sh
 ```
 
-CI runs them on every push/PR both natively on Ubuntu and inside the Docker image (`.github/workflows/ci.yml`). GitHub Actions and the Docker base image are kept current by Dependabot.
+CI runs them on every push/PR, natively on Ubuntu and inside the Docker image (`.github/workflows/ci.yml`). GitHub Actions and the Docker base image are kept current by Dependabot.
 
 ## Fonts
 
-The installer sets up **JetBrainsMono Nerd Font** automatically. After install, point your **terminal emulator** at `JetBrainsMono Nerd Font`. Skip the font install with `NO_FONT=1`.
-
-Manual install, if you skipped it:
+The installer sets up **JetBrainsMono Nerd Font** automatically (`NO_FONT=1` to skip). Point your **terminal emulator** at it afterward. Manual install:
 
 ```bash
 # Linux — per-user, no root
@@ -144,7 +131,7 @@ brew install --cask font-jetbrains-mono-nerd-font
 
 ## Keymaps
 
-Leader is `<Space>`. `:map <leader>` / `:verbose map <lhs>` show what's bound; the source under `lua/core/keymaps/`, `lua/finder/`, `lua/git/` is the ground truth. Highlights:
+Leader is `<Space>`. `:map <leader>` / `:verbose map <lhs>` show what's bound; the source under `lua/core/keymaps/`, `lua/finder/`, `lua/git/` is the ground truth.
 
 | Key | Action |
 |---|---|
