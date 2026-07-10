@@ -50,7 +50,10 @@ o.swapfile = false
 o.backup = false
 local undo_path = vim.fn.stdpath("data") .. "/undodir"
 if vim.fn.isdirectory(undo_path) == 0 then
-  vim.fn.mkdir(undo_path, "p", 0700)
+  -- prot MUST be a string: a bare Lua 0700 is decimal 700, not octal, and
+  -- yields garbage permissions (e.g. owner write-only, no read/exec) that
+  -- break undofile writes into a freshly created directory.
+  vim.fn.mkdir(undo_path, "p", "0700")
 end
 o.undodir = undo_path
 o.undofile = true
