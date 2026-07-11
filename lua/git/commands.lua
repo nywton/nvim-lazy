@@ -200,6 +200,15 @@ function M.status()
     vim.bo[new_buf].bufhidden = "wipe"
     vim.api.nvim_win_set_buf(preview_win, new_buf)
 
+    -- Git's default ANSI green (word-diff's "added" color) is a fully
+    -- saturated #00cd00-ish green — fine for a few highlighted words in a
+    -- normal diff, but an untracked file is 100% "added", so the whole pane
+    -- turns into a wall of bright green. b:terminal_color_2 is read once at
+    -- TermOpen (see :h terminal-config), so it must be set before jobstart
+    -- below; toning it down here matches the muted green diffsplit.lua uses
+    -- for the same "added" concept elsewhere in git.* previews.
+    vim.b[new_buf].terminal_color_2 = "#4d9a6a"
+
     if entry then
       local cur_win = vim.api.nvim_get_current_win()
       vim.api.nvim_set_current_win(preview_win)
