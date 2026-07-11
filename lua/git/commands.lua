@@ -24,6 +24,23 @@ local function scratch(cmd, ft, name)
   return buf
 end
 
+-- Same as scratch(), but reformats diff/log -p output the way delta does:
+-- one label line per file instead of the diff --git/index/---/+++ block,
+-- hunk headers reduced to line number + function context, +/- lines with a
+-- full-line background. See git/delta.lua. No filetype set — that raw
+-- 'diff'/'git' syntax would fight the extmarks delta.lua paints on top of
+-- the rewritten lines.
+local function delta_scratch(cmd, name)
+  local out = vim.fn.systemlist(cmd)
+  vim.cmd("botright new")
+  local buf = vim.api.nvim_get_current_buf()
+  vim.bo[buf].buftype = "nofile"
+  vim.bo[buf].bufhidden = "wipe"
+  require("git.delta").render_to_buffer(buf, out)
+  if name then pcall(vim.api.nvim_buf_set_name, buf, name) end
+  return buf
+end
+
 -- Diff command for the status preview pane, run inside a terminal buffer
 -- (not a plain scratch one) so --word-diff=color's ANSI output — the
 -- intra-line word highlighting git itself computes — renders as real
@@ -258,7 +275,7 @@ function M.diff(target)
     vim.notify("Not a git repo", vim.log.levels.WARN)
     return
   end
-  scratch("git -C " .. vim.fn.shellescape(root) .. " diff " .. (target or ""), "diff", "git-diff")
+  delta_scratch("git -C " .. vim.fn.shellescape(root) .. " diff " .. (target or ""), "git-diff")
 end
 
 function M.blame()
@@ -281,7 +298,7 @@ function M.log()
     return
   end
   local file = vim.fn.expand("%:.")
-  scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -- " .. vim.fn.shellescape(file), "git", "git-log")
+  delta_scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -- " .. vim.fn.shellescape(file), "git-log")
 end
 
 -- Repo-wide counterpart to M.log() — full patches (-p), not scoped to the
@@ -293,7 +310,7 @@ function M.log_repo()
     vim.notify("Not a git repo", vim.log.levels.WARN)
     return
   end
-  scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -n 200", "git", "git-log")
+  delta_scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -n 200", "git-log")
 end
 
 function M.stage_file()
