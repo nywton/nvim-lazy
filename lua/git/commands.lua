@@ -297,22 +297,10 @@ function M.blame()
   scratch("git -C " .. vim.fn.shellescape(root) .. " blame -- " .. vim.fn.shellescape(file), "git", "git-blame")
 end
 
--- Log of the CURRENT FILE only, with full patches (-p) — not a repo-wide
--- overview. If you want the latter back, `git log --oneline --graph` in the
--- terminal (<leader>t) is one line to type.
-function M.log()
-  local root = git_root()
-  if not root then
-    vim.notify("Not a git repo", vim.log.levels.WARN)
-    return
-  end
-  local file = vim.fn.expand("%:.")
-  delta_scratch("git -C " .. vim.fn.shellescape(root) .. " log -p -- " .. vim.fn.shellescape(file), "git-log")
-end
-
--- Repo-wide counterpart to M.log() — full patches (-p), not scoped to the
--- current file. Capped at 200 commits like the old --oneline overview was,
--- since -p output is a lot bigger per commit.
+-- Full-patch (-p) log, capped at 200 commits like the old --oneline overview
+-- was, since -p output is a lot bigger per commit. Repo-wide flat scratch
+-- view — for a navigable per-commit/per-file browser see git.history
+-- (<leader>gl).
 function M.log_repo()
   local root = git_root()
   if not root then
