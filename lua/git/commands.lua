@@ -11,6 +11,18 @@ local function git_root()
   return vim.v.shell_error == 0 and root or nil
 end
 
+-- Whether `file` exists in HEAD at all — false for untracked files *and*
+-- anything added-but-not-yet-committed. Those need a whole-file `git add`
+-- instead of a hunk-level `git apply --cached`: the hunk's patch header
+-- frames it as "new file, --- /dev/null", and applying that against
+-- --cached conflicts the moment the file already has *some* content in the
+-- index (from an earlier `git add`) — the "old side" claims empty, the
+-- index blob isn't. Same guard git.review's accept_hunk uses.
+local function has_head_version(root, file)
+  vim.fn.system({ "git", "-C", root, "cat-file", "-e", "HEAD:" .. file })
+  return vim.v.shell_error == 0
+end
+
 local function scratch(cmd, ft, name)
   local out = vim.fn.systemlist(cmd)
   vim.cmd("botright new")
@@ -41,18 +53,18 @@ local function delta_scratch(cmd, name)
   return buf
 end
 
--- Diff command for the status preview pane, run inside a terminal buffer
--- (not a plain scratch one) so --word-diff=color's ANSI output — the
--- intra-line word highlighting git itself computes — renders as real
--- colors instead of raw escape codes. Untracked files have nothing to diff
--- against in the index/HEAD, so compare against /dev/null; everything else
--- diffs straight against HEAD (covers staged + unstaged in one call — same
--- approach as git/signs.lua).
+-- Diff command for the status preview pane — plain text, no --color/
+-- --word-diff: the preview renders through git/delta.lua (same collapsed
+-- header + full-line +/- coloring as <leader>gd/gL), which paints its own
+-- extmarks over raw diff text and would just fight ANSI escape codes.
+-- Untracked files have nothing to diff against in the index/HEAD, so
+-- compare against /dev/null; everything else diffs straight against HEAD
+-- (covers staged + unstaged in one call — same approach as git/signs.lua).
 local function preview_diff_cmd(root, code, file)
   if code:sub(1, 1) == "?" then
-    return { "git", "-C", root, "diff", "--no-index", "--color=always", "--word-diff=color", "--", "/dev/null", file }
+    return { "git", "-C", root, "diff", "--no-index", "--", "/dev/null", file }
   end
-  return { "git", "-C", root, "diff", "HEAD", "--color=always", "--word-diff=color", "--", file }
+  return { "git", "-C", root, "diff", "HEAD", "--", file }
 end
 
 -- Fugitive-style section grouping for the status list. A file can land in
@@ -185,43 +197,6 @@ function M.status()
     end
   end
 
-  local function update_preview()
-    if not vim.api.nvim_win_is_valid(list_win) or not vim.api.nvim_win_is_valid(preview_win) then
-      return
-    end
-    local lnum = vim.api.nvim_win_get_cursor(list_win)[1]
-    local entry = entries[lnum]
-
-    -- A fresh buffer per refresh: a terminal buffer is inert once its job
-    -- exits, so "updating" the preview means swapping in a new one rather
-    -- than rewriting lines. bufhidden=wipe cleans up the old one the moment
-    -- it stops being displayed (right after nvim_win_set_buf below).
-    local new_buf = vim.api.nvim_create_buf(false, true)
-    vim.bo[new_buf].bufhidden = "wipe"
-    vim.api.nvim_win_set_buf(preview_win, new_buf)
-
-    -- Git's default ANSI green (word-diff's "added" color) is a fully
-    -- saturated #00cd00-ish green — fine for a few highlighted words in a
-    -- normal diff, but an untracked file is 100% "added", so the whole pane
-    -- turns into a wall of bright green. b:terminal_color_2 is read once at
-    -- TermOpen (see :h terminal-config), so it must be set before jobstart
-    -- below; toning it down here matches the muted green diffsplit.lua uses
-    -- for the same "added" concept elsewhere in git.* previews.
-    vim.b[new_buf].terminal_color_2 = "#4d9a6a"
-
-    if entry then
-      local cur_win = vim.api.nvim_get_current_win()
-      vim.api.nvim_set_current_win(preview_win)
-      vim.fn.jobstart(preview_diff_cmd(root, entry.code, entry.file), { term = true })
-      vim.api.nvim_set_current_win(cur_win)
-    else
-      vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, { "(clean)" })
-    end
-  end
-
-  load_entries()
-  update_preview()
-
   local function close()
     for _, w in ipairs({ list_win, preview_win }) do
       if vim.api.nvim_win_is_valid(w) then
@@ -229,6 +204,121 @@ function M.status()
       end
     end
   end
+
+  -- Forward-declared: refresh, hunk_action, bind_preview and update_preview
+  -- all call into each other (bind_preview binds keys that call
+  -- hunk_action, which calls refresh, which calls update_preview, which
+  -- calls bind_preview again on the fresh buffer) — plain `local function`
+  -- in sequence can't express that cycle, so the names are declared upfront
+  -- and assigned below.
+  local refresh, hunk_action, bind_preview, update_preview
+
+  -- Re-fetches the file list (a staged/discarded hunk can move a file
+  -- between sections, or drop it off the list entirely) while keeping the
+  -- same file selected by path rather than by line number, since its line
+  -- moves around as sections gain/lose entries.
+  refresh = function(preserve_file)
+    load_entries()
+    if preserve_file then
+      for lnum, e in pairs(entries) do
+        if e.file == preserve_file then
+          pcall(vim.api.nvim_win_set_cursor, list_win, { lnum, 0 })
+          break
+        end
+      end
+    end
+    update_preview()
+  end
+
+  local function block_under_cursor(blocks)
+    if not vim.api.nvim_win_is_valid(preview_win) then return nil end
+    local lnum = vim.api.nvim_win_get_cursor(preview_win)[1]
+    return require("git.delta").block_at(blocks, lnum)
+  end
+
+  -- Applies the raw patch for one resolved hunk. `args` is git-apply's own
+  -- flags: {"--cached"} to stage it, {"-R"} to discard it from the working
+  -- tree (index untouched — matches plain git semantics: discarding a
+  -- staged hunk still leaves it staged until you also unstage).
+  hunk_action = function(block, args, verb)
+    local patch = table.concat(block.header, "\n") .. "\n" .. table.concat(block.lines, "\n") .. "\n"
+    local cmd = { "git", "-C", root, "apply", "--whitespace=nowarn" }
+    vim.list_extend(cmd, args)
+    table.insert(cmd, "-")
+    local result = vim.fn.system(cmd, patch)
+
+    if vim.v.shell_error ~= 0 then
+      vim.notify(verb .. " hunk failed: " .. vim.trim(result), vim.log.levels.ERROR)
+    else
+      vim.notify(verb .. "d hunk in " .. block.file, vim.log.levels.INFO)
+      refresh(block.file)
+    end
+  end
+
+  bind_preview = function(buf, blocks)
+    local opts = { buffer = buf, nowait = true, silent = true }
+    vim.keymap.set("n", "s", function()
+      local block = block_under_cursor(blocks)
+      if not block then
+        vim.notify("No hunk here", vim.log.levels.INFO)
+        return
+      end
+      if not has_head_version(root, block.file) then
+        vim.fn.system({ "git", "-C", root, "add", "--", block.file })
+        vim.notify("Staged (new file): " .. block.file, vim.log.levels.INFO)
+        refresh(block.file)
+        return
+      end
+      hunk_action(block, { "--cached" }, "Stage")
+    end, vim.tbl_extend("force", opts, { desc = "Stage hunk under cursor" }))
+    vim.keymap.set("n", "d", function()
+      local block = block_under_cursor(blocks)
+      if not block then
+        vim.notify("No hunk here", vim.log.levels.INFO)
+        return
+      end
+      if vim.fn.confirm("Discard this hunk? This cannot be undone.", "&Yes\n&No", 2) == 1 then
+        hunk_action(block, { "-R" }, "Discard")
+      end
+    end, vim.tbl_extend("force", opts, { desc = "Discard hunk under cursor" }))
+    vim.keymap.set("n", "q", close, vim.tbl_extend("force", opts, { desc = "Close git status" }))
+    vim.keymap.set("n", "<Esc>", close, vim.tbl_extend("force", opts, { desc = "Close git status" }))
+  end
+
+  update_preview = function()
+    if not vim.api.nvim_win_is_valid(list_win) or not vim.api.nvim_win_is_valid(preview_win) then
+      return
+    end
+    local lnum = vim.api.nvim_win_get_cursor(list_win)[1]
+    local entry = entries[lnum]
+
+    -- A fresh buffer per refresh, same as before — bufhidden=wipe cleans up
+    -- the old one the moment it stops being displayed (right after
+    -- nvim_win_set_buf below).
+    local new_buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[new_buf].buftype = "nofile"
+    vim.bo[new_buf].bufhidden = "wipe"
+    vim.api.nvim_win_set_buf(preview_win, new_buf)
+
+    if entry then
+      local out = vim.fn.systemlist(preview_diff_cmd(root, entry.code, entry.file))
+      local lines, hl, blocks = require("git.delta").render(out)
+      vim.bo[new_buf].modifiable = true
+      vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, lines)
+      vim.bo[new_buf].modifiable = false
+      vim.bo[new_buf].modified = false
+      local ns = vim.api.nvim_create_namespace("git_delta")
+      for hl_lnum, group in pairs(hl) do
+        vim.api.nvim_buf_set_extmark(new_buf, ns, hl_lnum - 1, 0, { end_col = #lines[hl_lnum], hl_group = group })
+      end
+      bind_preview(new_buf, blocks)
+    else
+      vim.api.nvim_buf_set_lines(new_buf, 0, -1, false, { "(clean)" })
+    end
+  end
+
+  load_entries()
+  update_preview()
 
   vim.api.nvim_create_autocmd("CursorMoved", { buffer = list_buf, callback = update_preview })
   vim.api.nvim_create_autocmd("WinClosed", {

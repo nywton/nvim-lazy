@@ -30,12 +30,28 @@ local function file_label(old_path, new_path, flags)
   end
 end
 
--- Returns (rendered_lines, {[lnum] = hl_group}) — a plain array plus a
--- sparse map, mirroring the header_lines pattern already used by
--- git.commands/git.review for extmark application.
+-- Returns (rendered_lines, {[lnum] = hl_group}, blocks) — the first two
+-- mirror the header_lines pattern already used by git.commands/git.review
+-- for extmark application. `blocks` is one entry per hunk: { file, header
+-- (raw "diff --git"/index/---/+++ lines, needed by `git apply` alongside a
+-- hunk body), lines (the raw "@@ ... @@" line plus its body, exactly what
+-- git-apply expects), render_start, render_end (1-indexed range in `out`
+-- this hunk occupies) } — lets a caller map a cursor line in the *rendered*
+-- buffer (headers collapsed, boilerplate stripped) back to the exact raw
+-- patch text for that hunk, e.g. to stage/discard it with git-apply. See
+-- git.commands' hunk_at_cursor.
 function M.render(raw_lines)
-  local out, hl = {}, {}
+  local out, hl, blocks = {}, {}, {}
   local i, n = 1, #raw_lines
+  local cur_header, cur_file, cur_block = nil, nil, nil
+
+  local function close_block()
+    if cur_block then
+      cur_block.render_end = #out
+      table.insert(blocks, cur_block)
+      cur_block = nil
+    end
+  end
 
   local function emit(text, group)
     table.insert(out, text)
@@ -47,8 +63,10 @@ function M.render(raw_lines)
     local old_path, new_path = line:match("^diff %-%-git a/(.-) b/(.*)$")
 
     if old_path then
+      close_block()
       local flags = {}
       local minus_file, plus_file
+      local raw_header = { line }
       i = i + 1
       while i <= n do
         local l = raw_lines[i]
@@ -71,36 +89,59 @@ function M.render(raw_lines)
         elseif l:match("^%+%+%+ ") then
           plus_file = l:match("^%+%+%+ (.*)$")
         end
+        table.insert(raw_header, l)
         i = i + 1
       end
       minus_file = strip_prefix(minus_file or old_path)
       plus_file = strip_prefix(plus_file or new_path)
       emit("  " .. file_label(minus_file, plus_file, flags), "Title")
       emit("")
+      cur_header, cur_file = raw_header, plus_file
     else
       local new_start, context = line:match("^@@ %-%d+,?%d* %+(%d+),?%d* @@(.*)$")
       if new_start then
+        close_block()
+        cur_block = { file = cur_file, header = cur_header, lines = { line }, render_start = #out + 1 }
         context = vim.trim(context)
         if context ~= "" then
           emit("  " .. new_start .. "  " .. context, "Comment")
         end
         emit("")
       elseif line:match("^commit ") then
+        close_block()
         emit(line, "Title")
       elseif line:match("^Author: ") or line:match("^Date:   ") or line:match("^Merge: ") then
         emit(line, "Comment")
-      elseif line:sub(1, 1) == "+" then
-        emit(line, "DiffAdd")
-      elseif line:sub(1, 1) == "-" then
-        emit(line, "DiffDelete")
       else
-        emit(line)
+        if cur_block then table.insert(cur_block.lines, line) end
+        if line:sub(1, 1) == "+" then
+          emit(line, "DiffAdd")
+        elseif line:sub(1, 1) == "-" then
+          emit(line, "DiffDelete")
+        else
+          emit(line)
+        end
       end
       i = i + 1
     end
   end
+  close_block()
 
-  return out, hl
+  return out, hl, blocks
+end
+
+-- The block whose rendered range contains `lnum`, else the nearest one —
+-- same "closest hunk to cursor" heuristic git.review's nearest_hunk uses.
+function M.block_at(blocks, lnum)
+  local best, best_dist
+  for _, b in ipairs(blocks) do
+    local dist = (lnum >= b.render_start and lnum <= b.render_end) and 0
+      or math.min(math.abs(lnum - b.render_start), math.abs(lnum - b.render_end))
+    if not best or dist < best_dist then
+      best, best_dist = b, dist
+    end
+  end
+  return best
 end
 
 -- Renders straight into a scratch buffer: sets lines, then paints the
