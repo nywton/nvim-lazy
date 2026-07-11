@@ -59,6 +59,12 @@ local function classify(code)
   return sections
 end
 
+-- Exposed for git.review: it renders the same section-grouped file list
+-- (so staging a hunk visibly moves a file between Unstaged/Staged there
+-- too) instead of duplicating this classification.
+M.SECTION_ORDER = SECTION_ORDER
+M.classify = classify
+
 -- Floating, centered status picker with a live diff preview — the git
 -- equivalent of telescope's git_status. No plugin: two floating windows
 -- (a scratch list + a terminal buffer replaced on every CursorMoved).

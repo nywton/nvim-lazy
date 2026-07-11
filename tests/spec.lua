@@ -71,6 +71,9 @@ check("jj -> <Esc> (insert)", vim.fn.maparg("jj", "i") ~= "")
 check("<C-p> -> rg+fzf find files", vim.fn.maparg("<C-p>", "n") ~= "")
 check("<leader>s -> rg+fzf live grep (floating, previewed)", vim.fn.maparg("<leader>s", "n") ~= "")
 check("<leader>gg -> git status", vim.fn.maparg("<leader>gg", "n") ~= "")
+check("<leader>gv -> side-by-side diff vs HEAD", vim.fn.maparg("<leader>gv", "n") ~= "")
+check("<leader>gV -> side-by-side diff vs picked revision (fzf)", vim.fn.maparg("<leader>gV", "n") ~= "")
+check("<leader>gr -> repo-wide diff review", vim.fn.maparg("<leader>gr", "n") ~= "")
 check("<leader>gb -> toggle inline git blame", vim.fn.maparg("<leader>gb", "n") ~= "")
 check("<leader>gB -> full-file git blame", vim.fn.maparg("<leader>gB", "n") ~= "")
 check("<leader>gL -> repo-wide git log -p", vim.fn.maparg("<leader>gL", "n") ~= "")
@@ -85,7 +88,7 @@ check("gr -> rg+fzf navigation (no LSP/ctags)", vim.fn.maparg("gr", "n") ~= "")
 print("# custom modules load cleanly")
 for _, mod in ipairs({
   "finder.files", "finder.grep", "finder.picker", "finder.quickset",
-  "git.commands", "git.hunks", "git.signs", "git.blame", "ui.statusline",
+  "git.commands", "git.hunks", "git.signs", "git.blame", "git.diffsplit", "git.review", "ui.statusline",
 }) do
   check("require('" .. mod .. "')", (pcall(require, mod)))
 end

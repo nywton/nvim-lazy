@@ -100,7 +100,7 @@ Shell history is kept in a named volume, so it survives restarts.
 - **File finding** (`<C-p>`): `rg --files` piped through `fzf` in a terminal buffer
 - **Content search** (`<leader>s`): ripgrep straight into the quickfix list, navigated with `<C-k>`/`<C-j>`
 - **Quickset** (`<leader>a` add / `<C-e>` menu / `<C-h>`,`<C-t>` prev-next): a ~30-line harpoon-style hand-picked file list, session-local
-- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status), `<leader>gd` (diff), `<leader>gb`/`gB` (blame), `<leader>gl` (log), `]c`/`[c` (hunk navigation). Interactive/stateful commands (commit, push, pull, rebase) — use the terminal (`<leader>t`) directly.
+- **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status), `<leader>gd` (diff), `<leader>gb`/`gB` (blame), `<leader>gl` (log), `]c`/`[c` (hunk navigation, gutter signs dim once a hunk is staged instead of showing one flat color), `<leader>gv`/`gV` (side-by-side diff, delta-style: two real Neovim windows in `:diffthis` mode with syntax highlighting, plus GitHub/VSCode-style coloring — green on the working-tree side, red on the older revision's side, filler left fully transparent instead of painted over — `gV` picks the revision via `fzf`), `<leader>gr` (repo-wide review: same Staged/Unstaged/Untracked file list as `<leader>gg`, same colored side-by-side diff as `<leader>gv` instead of a preview pane — `<C-n>`/`<C-p>` step hunk-by-hunk within a file and fall through to the next/previous file once it runs out, `<leader>gs` stages just the hunk under the cursor via `git apply --cached` and auto-advances to the next one, `q` quits). Interactive/stateful commands (commit, push, pull, rebase) — use the terminal (`<leader>t`) directly.
 - **UI**: habamax (built-in colorscheme, transparent background) + a built-in `vim.o.statusline` — no lualine
 - **Terminal**: plugin-free toggleable floating terminal (`<leader>t`); `<Esc><Esc>` hides it, and the shell exiting closes it automatically
 - **Neovide**: GUI tuning with blurred floating windows, shadows, and cursor animations (only applied when run inside Neovide)
@@ -140,6 +140,8 @@ Leader is `<Space>`. `:map <leader>` / `:verbose map <lhs>` show what's bound; t
 | `gd` / `gi` / `gr` | Go to word occurrence (rg + fzf) |
 | `<leader>gg` | Git status (scratch buffer: `<CR>` open, `s` stage, `u` unstage) |
 | `<leader>gd` / `gl` | Git diff / log |
+| `<leader>gv` / `gV` | Side-by-side diff vs HEAD / vs a picked revision (fzf) |
+| `<leader>gr` | Repo-wide review: `<C-n>`/`<C-p>` hunk then file, `<leader>gs` stage hunk, `q` quit |
 | `<leader>gb` / `gB` | Toggle inline current-line blame / full-file blame history |
 | `]c` / `[c` | Next/previous uncommitted hunk, repo-wide |
 | `<leader>a` / `<C-e>` / `<C-h>` / `<C-t>` | Quickset: add / menu / prev / next |

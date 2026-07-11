@@ -8,6 +8,15 @@ vim.api.nvim_set_hl(0, "GitSignsAdd", { link = "DiffAdd" })
 vim.api.nvim_set_hl(0, "GitSignsChange", { link = "DiffChange" })
 vim.api.nvim_set_hl(0, "GitSignsDelete", { link = "DiffDelete" })
 
+-- Staged hunks (already `git add`ed — see git/review.lua's hunk-level
+-- accept) get a dimmed sign instead of the same bright one unstaged hunks
+-- use, so the gutter actually shows two states instead of one. Linked to
+-- Comment rather than a hardcoded color so it stays legible under any
+-- colorscheme, matching the groups above.
+vim.api.nvim_set_hl(0, "GitSignsStagedAdd", { link = "Comment" })
+vim.api.nvim_set_hl(0, "GitSignsStagedChange", { link = "Comment" })
+vim.api.nvim_set_hl(0, "GitSignsStagedDelete", { link = "Comment" })
+
 -- Transparent background — let the terminal's own background (and its
 -- transparency, if any) show through instead of habamax painting one.
 -- Skipped under Neovide: it's a GUI window, not a terminal, and already

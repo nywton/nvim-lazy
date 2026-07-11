@@ -3,6 +3,14 @@
 -- +/~/_ via extmarks (core API, no plugin). Colors come from the
 -- GitSignsAdd/Change/Delete highlight groups defined in core/colorscheme.lua.
 --
+-- Two states, not one: `git diff HEAD` (staged+unstaged combined) decides
+-- *which* lines get a sign, same as before, but each sign is then checked
+-- against `git diff` (index-vs-worktree, unstaged only) to see whether it's
+-- still genuinely unstaged or already `git add`ed — see git/review.lua's
+-- hunk-level accept, which is what actually produces that second state.
+-- Both diffs report line numbers against the working tree (the "new" side
+-- in both cases), so they line up without any remapping.
+--
 -- No current-line blame, no stage/reset-hunk from here — see git/hunks.lua
 -- for ]c/[c navigation and git/commands.lua's status buffer (`s`/`u`) for
 -- staging.
@@ -64,6 +72,12 @@ local function hunks_to_signs(hunks)
   return signs
 end
 
+local STAGED_HL = {
+  GitSignsAdd = "GitSignsStagedAdd",
+  GitSignsChange = "GitSignsStagedChange",
+  GitSignsDelete = "GitSignsStagedDelete",
+}
+
 function M.refresh(buf)
   buf = buf or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(buf) then
@@ -85,19 +99,28 @@ function M.refresh(buf)
   end
   local relpath = filename:sub(#root + 2)
 
-  local diff_lines
+  local head_diff, unstaged_diff
   if is_untracked(root, relpath) then
-    diff_lines = vim.fn.systemlist({ "git", "-C", root, "diff", "--no-index", "-U0", "--", "/dev/null", relpath })
+    -- Nothing to stage-vs-unstage yet — untracked files are all one state.
+    head_diff = vim.fn.systemlist({ "git", "-C", root, "diff", "--no-index", "-U0", "--", "/dev/null", relpath })
+    unstaged_diff = head_diff
   else
-    diff_lines = vim.fn.systemlist({ "git", "-C", root, "diff", "HEAD", "-U0", "--", relpath })
+    head_diff = vim.fn.systemlist({ "git", "-C", root, "diff", "HEAD", "-U0", "--", relpath })
+    unstaged_diff = vim.fn.systemlist({ "git", "-C", root, "diff", "-U0", "--", relpath })
+  end
+
+  local still_unstaged = {}
+  for _, s in ipairs(hunks_to_signs(parse_hunks(unstaged_diff))) do
+    still_unstaged[s.lnum] = true
   end
 
   local line_count = vim.api.nvim_buf_line_count(buf)
-  for _, s in ipairs(hunks_to_signs(parse_hunks(diff_lines))) do
+  for _, s in ipairs(hunks_to_signs(parse_hunks(head_diff))) do
     if s.lnum >= 1 and s.lnum <= line_count then
+      local hl = still_unstaged[s.lnum] and s.hl or (STAGED_HL[s.hl] or s.hl)
       pcall(vim.api.nvim_buf_set_extmark, buf, ns, s.lnum - 1, 0, {
         sign_text = s.text,
-        sign_hl_group = s.hl,
+        sign_hl_group = hl,
         priority = 6,
       })
     end
