@@ -4,7 +4,7 @@
 
 A minimal, **Node-free**, **zero-plugin** Lua config. No plugin manager, no lockfile, nothing to bootstrap — just Neovim core plus a couple of external CLI tools for search. Runs on **Ubuntu/Debian, macOS**, and in **Docker**.
 
-> **Zero plugins, full stop:** no plugin manager, no colorscheme plugin, no treesitter plugin — just Neovim core (built-in `habamax` colorscheme, built-in `:syntax` highlighting). No LSP, no ctags, no format-on-save, no completion plugin, no Mason.
+> **Zero plugins, full stop:** no plugin manager, no treesitter plugin — just Neovim core (built-in `:syntax` highlighting, plus a hand-authored `colors/catppuccin.lua` sourced from the published Catppuccin Mocha palette, not the upstream plugin). No LSP, no ctags, no format-on-save, no completion plugin, no Mason.
 
 Requires **Neovim 0.12.0+** (built-in `'autocomplete'` needs it).
 
@@ -101,7 +101,7 @@ Shell history is kept in a named volume, so it survives restarts.
 - **Content search** (`<leader>s`): ripgrep straight into the quickfix list, navigated with `<C-k>`/`<C-j>`
 - **Quickset** (`<leader>a` add / `<C-e>` menu / `<C-h>`,`<C-t>` prev-next): a ~30-line harpoon-style hand-picked file list, session-local
 - **Git**: raw `git` + scratch buffers, no fugitive/gitsigns/diffview — `<leader>gg` (status), `<leader>gd` (diff), `<leader>gb`/`gB` (blame), `<leader>gl` (log), `]c`/`[c` (hunk navigation, gutter signs dim once a hunk is staged instead of showing one flat color), `<leader>gv`/`gV` (side-by-side diff, delta-style: two real Neovim windows in `:diffthis` mode with syntax highlighting, plus GitHub/VSCode-style coloring — green on the working-tree side, red on the older revision's side, filler left fully transparent instead of painted over — `gV` picks the revision via `fzf`), `<leader>gr` (repo-wide review: same Staged/Unstaged/Untracked file list as `<leader>gg`, same colored side-by-side diff as `<leader>gv` instead of a preview pane — `<C-n>`/`<C-p>` step hunk-by-hunk within a file and fall through to the next/previous file once it runs out, `<leader>gs` stages just the hunk under the cursor via `git apply --cached` and auto-advances to the next one, `q` quits). Interactive/stateful commands (commit, push, pull, rebase) — use the terminal (`<leader>t`) directly.
-- **UI**: habamax (built-in colorscheme, transparent background) + a built-in `vim.o.statusline` — no lualine
+- **UI**: Catppuccin Mocha (hand-authored `colors/catppuccin.lua`, transparent background) + a built-in `vim.o.statusline` — no lualine
 - **Terminal**: plugin-free toggleable floating terminal (`<leader>t`); `<Esc><Esc>` hides it, and the shell exiting closes it automatically
 - **Neovide**: GUI tuning with blurred floating windows, shadows, and cursor animations (only applied when run inside Neovide)
 

@@ -58,7 +58,7 @@ print(string.format("info - node on PATH: %s (not used by this config)",
 soft("tmux", vim.fn.executable("tmux") == 1)
 
 print("# colorscheme")
-check("colorscheme is habamax", vim.g.colors_name == "habamax")
+check("colorscheme is catppuccin", vim.g.colors_name == "catppuccin")
 check("GitSignsAdd highlight defined", vim.fn.hlexists("GitSignsAdd") == 1)
 check("GitSignsChange highlight defined", vim.fn.hlexists("GitSignsChange") == 1)
 check("GitSignsDelete highlight defined", vim.fn.hlexists("GitSignsDelete") == 1)

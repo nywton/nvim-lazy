@@ -1,5 +1,5 @@
 vim.o.cursorline = true
-vim.cmd.colorscheme("habamax")
+vim.cmd.colorscheme("catppuccin")
 
 -- lua/git/signs.lua's bare sign-column implementation reads these highlight
 -- groups. DiffAdd/DiffChange/DiffDelete are core groups every colorscheme
